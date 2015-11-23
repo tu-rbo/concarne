@@ -42,14 +42,14 @@ class Pattern(object):
             assert (self.target_var is not None)
             self.target_loss = lasagne.objectives.categorical_crossentropy(
                 self.get_psi_output_for(self.input_var), self.target_var
-            )
+            ).mean()
 
         if self.context_loss is None:
             assert (self.input_var is not None)
             assert (self.context_var is not None)
-            self.context_loss = lasagne.objectives.categorical_crossentropy(
+            self.context_loss = lasagne.objectives.squared_error(
                 self.get_phi_output_for(self.input_var), self.context_var
-            )
+            ).mean()
 
     @property
     def output_shape(self):
@@ -61,8 +61,7 @@ class Pattern(object):
         pattern.
 
         By default, all parameters that participate in the forward pass will be
-        returned (in the order they were registered in the Layer's constructor
-        via :meth:`add_param()`). The list can optionally be filtered by
+        returned. The list can optionally be filtered by
         specifying tags as keyword arguments. For example, ``trainable=True``
         will only return trainable parameters, and ``regularizable=True``
         will only return parameters that can be regularized (e.g., by L2
@@ -124,9 +123,9 @@ class Pattern(object):
         phi_output = self.phi.get_output_for(input, **kwargs)
         return self.psi.get_output_for(phi_output, **kwargs)
 
-#    def get_phi_output_for(self, input, **kwargs):
-#        return self.phi.get_output_for(input, **kwargs)
+    def get_phi_output_for(self, input, **kwargs):
+        return self.phi.get_output_for(input, **kwargs)
 
-    def training_loss(self, main_weight=0.5, context_weight=0.5):
-        return main_weight * self.target_loss \
+    def training_loss(self, target_weight=0.5, context_weight=0.5):
+        return target_weight * self.target_loss \
             + context_weight * self.context_loss
