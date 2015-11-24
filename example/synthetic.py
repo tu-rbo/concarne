@@ -150,6 +150,32 @@ def iterate_direct_minibatches(inputs, targets, batchsize, contexts, shuffle=Fal
         yield inputs[excerpt], targets[excerpt], contexts[excerpt]
 
 
+#  ########################## Build Direct Pattern ###############################
+def build_multitask_pattern(input_var, target_var, context_var, n, m, num_classes):
+    input_layer = lasagne.layers.InputLayer(shape=(None, n),
+                                        input_var=input_var)
+    phi = build_linear_simple( input_layer, m, name="phi")
+    psi = build_linear_simple( phi, num_classes, 
+        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
+    beta = build_linear_simple( phi, m, name="beta")
+    
+    # if you want to change the standard loss terms used by a pattern
+    # you can define them here and pass them to the Pattern object
+    #target_loss=lasagne.objectives.categorical_crossentropy(
+    #    psi.get_output_for(phi.get_output_for(input_var)), 
+    #    target_var)    
+    #context_loss=lasagne.objectives.squared_error(
+    #    phi.get_output_for(input_var), 
+    #    context_var)
+        
+    mtp = concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta,
+                                         target_var=target_var, 
+                                         context_var=context_var,
+                                         #target_loss=target_loss.mean(),
+                                         #context_loss=context_loss.mean()
+                                         )
+    return mtp
+    
 #  ########################## Build Pairwise Pattern ###############################
 
 def build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m, num_classes):
@@ -199,11 +225,20 @@ def iterate_pairwise_transformation_aligned_minibatches(inputs, targets, batchsi
 
 #  ########################## Main ###############################
 
-def main(data, num_epochs=500, batchsize=50):
+def main(pattern_type, data, num_epochs=500, batchsize=50):
 #if __name__ == "__main__":
 #    data='pairwise'
 #    num_epochs=500
 #    batchsize=50
+
+    print ("Pattern: %s" % pattern_type)
+
+    if data in ["direct", "embedding"]:
+      assert (pattern_type != "pairwise")
+    elif pattern_type == "relative":
+      assert (pattern_type == "pairwise")
+    else:
+      raise Exception("Unsupported data %s" % data)
 
     #theano.config.on_unused_input = 'ignore'
     
@@ -217,7 +252,8 @@ def main(data, num_epochs=500, batchsize=50):
     
     pattern = None
     iterate_context_minibatches = None
-    
+        
+    # Load data and build pattern
     if data == "direct":
         # Load the dataset
         print("Loading direct data...")
@@ -227,19 +263,25 @@ def main(data, num_epochs=500, batchsize=50):
         n = X_train.shape[1]
         # intermediate dimension of C
         m = C_train.shape[1]
+        
+        if pattern_type == "direct":
+          pattern = build_direct_pattern(input_var, target_var, context_var, n, m, num_classes)
+          learning_rate=0.0001
+          loss_weights = {}
 
-        pattern = build_direct_pattern(input_var, target_var, context_var, n, m, num_classes)
+        elif pattern_type == "multitask":
+          pattern = build_multitask_pattern(input_var, target_var, context_var, n, m, num_classes)
+          learning_rate=0.0001
+          loss_weights = {}
+          
         iterate_context_minibatches = iterate_direct_minibatches
         iterate_context_minibatches_args = [X_train, y_train, batchsize, C_train, True]
         train_fn_inputs = [input_var, target_var, context_var]
     
-        learning_rate=0.0001
         
-        loss_weights = {}
-        
-    elif data == "pairwise":
+    elif data == "relative":
         # Load the dataset
-        print("Loading pairwise data...")
+        print("Loading relative data...")
         X_train, y_train, CX_train, Cy_train, X_val, y_val, X_test, y_test = load_relative_context_dataset()
 
         context_transform_var = T.matrix('context_transforms')
@@ -338,11 +380,14 @@ def main(data, num_epochs=500, batchsize=50):
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("data", type=str, help="which data to select", 
+    parser.add_argument("pattern", type=str, help="which pattern to use", 
                         default='direct', 
-                        choices=['direct', 'embedding', 'pairwise'])
+                        choices=['direct', 'multitask', 'multiview', 'pairwise'])
+    parser.add_argument("data", type=str, help="which data to load", 
+                        default='direct', 
+                        choices=['direct', 'embedding', 'relative'])
     parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
     parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=50, required=False)
     args = parser.parse_args()
   
-    pattern = main(args.data, args.num_epochs, args.batchsize)
+    pattern = main(args.pattern, args.data, args.num_epochs, args.batchsize)
