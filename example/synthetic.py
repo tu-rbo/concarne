@@ -67,23 +67,23 @@ def load_dataset(tr_data, tr_data_url, test_data, test_data_url):
     
 def load_direct_context_dataset():
     tr_data = "cl_synth_direct_d-50_e-0_n-500_seed-12340.npz"
-    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=5306a60ec558d8f1efbefaa9438a7261&download"
+    tr_data_url = ""
     test_data = "cl_synth_direct_d-50_e-0_ntest-50000_seed-12340.npz"
-    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=de69be9c5194defb985166b93f93d017&download"
+    test_data_url = ""
     return load_dataset(tr_data, tr_data_url, test_data, test_data_url)
 
 def load_embedding_context_dataset():
-    tr_data = "cl_synth_direct_d-50_e-0_n-500_seed-12340.npz"
-    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=5306a60ec558d8f1efbefaa9438a7261&download"
+    tr_data = "cl_synth_embedding_d-50_e-0_n-500_seed-12340.npz"
+    tr_data_url = ""
     test_data = "cl_synth_direct_d-50_e-0_ntest-50000_seed-12340.npz"
-    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=de69be9c5194defb985166b93f93d017&download"
+    test_data_url = ""
     return load_dataset(tr_data, tr_data_url, test_data, test_data_url)
 
 def load_relative_context_dataset():
     tr_data = "cl_synth_relative_d-50_e-0_n-500_seed-12340.npz"
-    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Frelative&files=cl_synth_relative_d-50_e-0_n-500_seed-12340.npz&download"
+    tr_data_url = ""
     test_data = "cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz"
-    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Frelative&files=cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz&download"
+    test_data_url = ""
     X, Y, C, X_valid, Y_valid, X_test, Y_test = load_dataset(tr_data, tr_data_url, test_data, test_data_url)
     
     # the context training data C contains stacked "x_j" and "y_ij" 
