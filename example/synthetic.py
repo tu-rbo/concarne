@@ -3,12 +3,10 @@
 #!/usr/bin/env python
 
 """
-Usage example for 
-
 This example corresponds to the "synthetic data" experiment in the paper
-[http://arxiv.org/abs/1511.06429], illustrating the direct pattern.
+[http://arxiv.org/abs/1511.06429], illustrating the various patterns.
 
-Note that this example is structured very similar to the mnist example for
+Note that the file is structured very similarly to the MNIST example for
 Lasagne in order to facilitate usage of concarne for Lasagne users.
 """
 
@@ -172,8 +170,6 @@ def build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_cla
     mtp = concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta,
                                          target_var=target_var, 
                                          context_var=context_var,
-                                         #target_loss=target_loss.mean(),
-                                         #context_loss=context_loss.mean()
                                          )
     return mtp
     
@@ -191,8 +187,6 @@ def build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_cla
     mtp = concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta,
                                          target_var=target_var, 
                                          context_var=context_var,
-                                         #target_loss=target_loss.mean(),
-                                         #context_loss=context_loss.mean()
                                          )
     return mtp    
     
@@ -262,6 +256,7 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
     else:
       raise Exception("Unsupported data %s" % data)
     
+    # ------------------------------------------------------
     # Prepare Theano variables for inputs and targets
     input_var = T.matrix('inputs')
     target_var = T.ivector('targets')
@@ -273,6 +268,7 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
     pattern = None
     iterate_context_minibatches = None
         
+    # ------------------------------------------------------
     # Load data and build pattern
     if data == "direct":
         print("Loading direct data...")
@@ -331,7 +327,7 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
         learning_rate=0.0001        
         loss_weights = {'target_weight':0.1, 'context_weight':0.9}
     
-        
+    # ------------------------------------------------------
     # Get the loss expression for training
     loss = pattern.training_loss(**loss_weights)
     loss = loss.mean()
@@ -361,6 +357,7 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
     # Compile a second function computing the validation loss and accuracy:
     val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
 
+    # ------------------------------------------------------
     # Finally, launch the training loop.
     print("Starting training...")
     # We iterate over epochs:
@@ -409,12 +406,13 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
         
     return pattern
         
+# ------------------------------------------------------        
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("pattern", type=str, help="which pattern to use", 
                         default='direct', 
                         choices=['direct', 'multitask', 'multiview', 'pairwise'])
-    parser.add_argument("data", type=str, help="which data to load", 
+    parser.add_argument("data", type=str, help="which context data to load", 
                         default='direct', 
                         choices=['direct', 'embedding', 'relative'])
     parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
