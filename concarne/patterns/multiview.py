@@ -1,31 +1,32 @@
 """
 
-Multi-task pattern. 
+Multi-view pattern. 
 
 """
 __all__ = [
-  "MultiTaskPattern",
+  "MultiViewPattern",
 ]
 
 from .base import Pattern
 
 import lasagne.objectives
 
-class MultiTaskPattern(Pattern):
+class MultiViewPattern(Pattern):
     """
-    The :class:`MultiTaskPattern` uses additional labels c for
-    learning beta(phi(x)) -> c:
+    The :class:`MultiViewPattern` is uses additional input (modality) c for
+    learning beta(c) -> s', such that s' ~ s, with s=phi(x):
     
                 psi
     x ----> s -----> y
-      phi    \  
-              \ beta(s)
-               \
-                ---> c
+      phi  /  
+          / beta(c)
+         /
+    c ---
+       
     """ 
   
     def __init__(self, **kwargs):
-        super(MultiTaskPattern, self).__init__(**kwargs)
+        super(MultiViewPattern, self).__init__(**kwargs)
 
         assert(self.beta is not None)
 
@@ -40,9 +41,9 @@ class MultiTaskPattern(Pattern):
             assert (self.input_var is not None)
             assert (self.context_var is not None)
             self.context_loss = lasagne.objectives.squared_error(
-                self.get_beta_output_for(self.input_var), self.context_var
+                self.get_beta_output_for(self.context_var), 
+                self.get_phi_output_for(self.input_var)
             ).mean()
             
     def get_beta_output_for(self, input, **kwargs):
-        phi_output = self.phi.get_output_for(input, **kwargs)
-        return self.beta.get_output_for(phi_output, **kwargs)
+        return self.beta.get_output_for(input, **kwargs)

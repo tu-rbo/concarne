@@ -63,28 +63,38 @@ def load_dataset(tr_data, tr_data_url, test_data, test_data_url):
     Y_test = np.cast['int32'](npz_test['Y_test'])
     #C_test = npz_train['C_test']
     
-    return X, Y, C, X_valid, Y_valid, X_test, Y_test
+    return (npz_train, npz_test),\
+      (X, Y, C, X_valid, Y_valid, X_test, Y_test)
     
 def load_direct_context_dataset():
     tr_data = "cl_synth_direct_d-50_e-0_n-500_seed-12340.npz"
     tr_data_url = ""
     test_data = "cl_synth_direct_d-50_e-0_ntest-50000_seed-12340.npz"
     test_data_url = ""
-    return load_dataset(tr_data, tr_data_url, test_data, test_data_url)
+    return load_dataset(tr_data, tr_data_url, test_data, test_data_url)[1]
 
 def load_embedding_context_dataset():
-    tr_data = "cl_synth_embedding_d-50_e-0_n-500_seed-12340.npz"
+    tr_data = "cl_synth_embedding_d-50_e-25_n-500_seed-12340.npz"
     tr_data_url = ""
-    test_data = "cl_synth_direct_d-50_e-0_ntest-50000_seed-12340.npz"
+    test_data = "cl_synth_embedding_d-50_e-25_ntest-50000_seed-12340.npz"
     test_data_url = ""
-    return load_dataset(tr_data, tr_data_url, test_data, test_data_url)
+
+    (npz_train, npz_test), res = \
+      load_dataset(tr_data, tr_data_url, test_data, test_data_url)
+      
+    # sanity check
+    assert (np.mean (npz_train['Q'] - npz_test['Q']) == 0.)
+      
+    return res
 
 def load_relative_context_dataset():
     tr_data = "cl_synth_relative_d-50_e-0_n-500_seed-12340.npz"
     tr_data_url = ""
     test_data = "cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz"
     test_data_url = ""
-    X, Y, C, X_valid, Y_valid, X_test, Y_test = load_dataset(tr_data, tr_data_url, test_data, test_data_url)
+
+    (_,_), (X, Y, C, X_valid, Y_valid, X_test, Y_test) \
+       = load_dataset(tr_data, tr_data_url, test_data, test_data_url)
     
     # the context training data C contains stacked "x_j" and "y_ij" 
     # which are aligned with the x_i in matrix X
@@ -150,23 +160,14 @@ def iterate_direct_minibatches(inputs, targets, batchsize, contexts, shuffle=Fal
         yield inputs[excerpt], targets[excerpt], contexts[excerpt]
 
 
-#  ########################## Build Direct Pattern ###############################
-def build_multitask_pattern(input_var, target_var, context_var, n, m, num_classes):
+#  ########################## Build Multi-task Pattern ###############################
+def build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_classes):
     input_layer = lasagne.layers.InputLayer(shape=(None, n),
                                         input_var=input_var)
-    phi = build_linear_simple( input_layer, m, name="phi")
+    phi = build_linear_simple( input_layer, d, name="phi")
     psi = build_linear_simple( phi, num_classes, 
         nonlinearity=lasagne.nonlinearities.softmax, name="psi")
     beta = build_linear_simple( phi, m, name="beta")
-    
-    # if you want to change the standard loss terms used by a pattern
-    # you can define them here and pass them to the Pattern object
-    #target_loss=lasagne.objectives.categorical_crossentropy(
-    #    psi.get_output_for(phi.get_output_for(input_var)), 
-    #    target_var)    
-    #context_loss=lasagne.objectives.squared_error(
-    #    phi.get_output_for(input_var), 
-    #    context_var)
         
     mtp = concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta,
                                          target_var=target_var, 
@@ -175,6 +176,25 @@ def build_multitask_pattern(input_var, target_var, context_var, n, m, num_classe
                                          #context_loss=context_loss.mean()
                                          )
     return mtp
+    
+#  ########################## Build Multi-view Pattern ###############################
+def build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_classes):
+    input_layer = lasagne.layers.InputLayer(shape=(None, n),
+                                        input_var=input_var)
+    context_input_layer = lasagne.layers.InputLayer(shape=(None, m),
+                                        input_var=context_var)
+    phi = build_linear_simple( input_layer, d, name="phi")
+    psi = build_linear_simple( phi, num_classes, 
+        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
+    beta = build_linear_simple( context_input_layer, d, name="beta")
+        
+    mtp = concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta,
+                                         target_var=target_var, 
+                                         context_var=context_var,
+                                         #target_loss=target_loss.mean(),
+                                         #context_loss=context_loss.mean()
+                                         )
+    return mtp    
     
 #  ########################## Build Pairwise Pattern ###############################
 
@@ -227,20 +247,20 @@ def iterate_pairwise_transformation_aligned_minibatches(inputs, targets, batchsi
 
 def main(pattern_type, data, num_epochs=500, batchsize=50):
 #if __name__ == "__main__":
-#    data='pairwise'
+#    pattern_type="multiview"
+#    data='direct'
 #    num_epochs=500
 #    batchsize=50
+    #theano.config.on_unused_input = 'ignore'
 
     print ("Pattern: %s" % pattern_type)
 
     if data in ["direct", "embedding"]:
       assert (pattern_type != "pairwise")
-    elif pattern_type == "relative":
+    elif data == "relative":
       assert (pattern_type == "pairwise")
     else:
       raise Exception("Unsupported data %s" % data)
-
-    #theano.config.on_unused_input = 'ignore'
     
     # Prepare Theano variables for inputs and targets
     input_var = T.matrix('inputs')
@@ -255,24 +275,36 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
         
     # Load data and build pattern
     if data == "direct":
-        # Load the dataset
         print("Loading direct data...")
         X_train, y_train, C_train, X_val, y_val, X_test, y_test = load_direct_context_dataset()
     
+    if data == "embedding":    
+        print("Loading embedding data...")
+        X_train, y_train, C_train, X_val, y_val, X_test, y_test = load_embedding_context_dataset()
+    
+    if data == "direct" or data == "embedding":
         # input dimension of X
         n = X_train.shape[1]
-        # intermediate dimension of C
+        # dimensionality of C
         m = C_train.shape[1]
+        # dimensionality of intermediate representation S
+        d = 1
         
         if pattern_type == "direct":
+          # d == m
           pattern = build_direct_pattern(input_var, target_var, context_var, n, m, num_classes)
           learning_rate=0.0001
           loss_weights = {}
 
         elif pattern_type == "multitask":
-          pattern = build_multitask_pattern(input_var, target_var, context_var, n, m, num_classes)
-          learning_rate=0.0001
-          loss_weights = {}
+          pattern = build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_classes)
+          learning_rate=0.001
+          loss_weights = {'target_weight':0.9, 'context_weight':0.1}
+
+        elif pattern_type == "multiview":
+          pattern = build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_classes)
+          learning_rate=0.01
+          loss_weights = {'target_weight':0.99, 'context_weight':0.01}
           
         iterate_context_minibatches = iterate_direct_minibatches
         iterate_context_minibatches_args = [X_train, y_train, batchsize, C_train, True]
@@ -296,8 +328,7 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
         iterate_context_minibatches_args  = (X_train, y_train, batchsize, CX_train, Cy_train, True)
         train_fn_inputs = [input_var, target_var, context_var, context_transform_var]
         
-        learning_rate=0.0001
-        
+        learning_rate=0.0001        
         loss_weights = {'target_weight':0.1, 'context_weight':0.9}
     
         
