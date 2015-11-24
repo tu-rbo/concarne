@@ -12,6 +12,19 @@ class Pattern(object):
 
     Parameters
     ----------
+    phi : a lasagne layer for computing the intermediate representation 
+        s = phi(x) from the input x
+    psi : a lasagne layer for computing the prediction of the target
+        from the intermediate representation s, psi(s)=y
+    target_var : Theano variable representing the target
+        Required for formulating the target loss.
+    context_var: Theano variable representing the target
+        The semantics of this variable depend on the pattern.
+        Note that additional context variables might be required by a pattern.
+    target_loss: Theano expression for the optimizing the target (optional).
+        All patterns have standard objectives applicable here
+    context_loss: Theano expression for the contextual loss (optional).
+        All patterns have standard objectives applicable here
     name : a string or None
         An optional name to attach to this layer.
     """
@@ -19,7 +32,6 @@ class Pattern(object):
                  phi, psi, beta=None, 
                  target_var=None, context_var=None, 
                  target_loss=None, context_loss=None,
-                 validation_loss=None,
                  name=None):
         self.phi = phi
         self.psi = psi
@@ -33,23 +45,8 @@ class Pattern(object):
 
         self.target_loss = target_loss
         self.context_loss = context_loss
-        self.validation_loss = validation_loss
     
         self.name = name
-            
-        if self.target_loss is None:
-            assert (self.input_var is not None)
-            assert (self.target_var is not None)
-            self.target_loss = lasagne.objectives.categorical_crossentropy(
-                self.get_psi_output_for(self.input_var), self.target_var
-            ).mean()
-
-        if self.context_loss is None:
-            assert (self.input_var is not None)
-            assert (self.context_var is not None)
-            self.context_loss = lasagne.objectives.squared_error(
-                self.get_phi_output_for(self.input_var), self.context_var
-            ).mean()
 
     @property
     def output_shape(self):
@@ -129,6 +126,9 @@ class Pattern(object):
     def get_psi_output_for(self, input, **kwargs):
         phi_output = self.phi.get_output_for(input, **kwargs)
         return self.psi.get_output_for(phi_output, **kwargs)
+
+    def get_beta_output_for(self, input, **kwargs):
+        raise NotImplementedError()
 
     def get_phi_output_for(self, input, **kwargs):
         return self.phi.get_output_for(input, **kwargs)

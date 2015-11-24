@@ -77,17 +77,36 @@ def load_embedding_context_dataset():
     return load_dataset(tr_data, tr_data_url, test_data, test_data_url)
 
 def load_relative_context_dataset():
-    tr_data = "cl_synth_direct_d-50_e-0_n-500_seed-12340.npz"
-    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=5306a60ec558d8f1efbefaa9438a7261&download"
-    test_data = "cl_synth_direct_d-50_e-0_ntest-50000_seed-12340.npz"
-    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=de69be9c5194defb985166b93f93d017&download"
-    return load_dataset(tr_data, tr_data_url, test_data, test_data_url)
+    tr_data = "cl_synth_relative_d-50_e-0_n-500_seed-12340.npz"
+    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Frelative&files=cl_synth_relative_d-50_e-0_n-500_seed-12340.npz&download"
+    test_data = "cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz"
+    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Frelative&files=cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz&download"
+    X, Y, C, X_valid, Y_valid, X_test, Y_test = load_dataset(tr_data, tr_data_url, test_data, test_data_url)
+    
+    # the context training data C contains stacked "x_j" and "y_ij" 
+    # which are aligned with the x_i in matrix X
+    CX = C[:, :X.shape[1]]
+    CY = C[:, X.shape[1]:]
+    
+    return X, Y, CX, CY, X_valid, Y_valid, X_test, Y_test
 
 
 # ############################# Helper functions #################################
 def build_linear_simple(input_layer, n_out, nonlinearity=None, name=None):
     network = lasagne.layers.DenseLayer(input_layer, n_out, nonlinearity=nonlinearity, b=None, name=name)
     return network    
+
+def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
+    """ Simple iterator for direct pattern """
+    assert len(inputs) == len(targets)
+    indices = np.arange(len(inputs))
+
+    if shuffle:
+        np.random.shuffle(indices)
+    
+    for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
+        excerpt = indices[start_idx:start_idx + batchsize]
+        yield inputs[excerpt], targets[excerpt]
 
 
 #  ########################## Build Direct Pattern ###############################
@@ -113,9 +132,9 @@ def build_direct_pattern(input_var, target_var, context_var, n, m, num_classes):
                                          #target_loss=target_loss.mean(),
                                          #context_loss=context_loss.mean()
                                          )
-    return dp                                         
+    return dp
 
-def iterate_minibatches(inputs, targets, batchsize, contexts=None, shuffle=False):
+def iterate_direct_minibatches(inputs, targets, batchsize, contexts, shuffle=False):
     """ Simple iterator for direct pattern """
     assert len(inputs) == len(targets)
     indices = np.arange(len(inputs))
@@ -125,21 +144,59 @@ def iterate_minibatches(inputs, targets, batchsize, contexts=None, shuffle=False
     
     for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
         excerpt = indices[start_idx:start_idx + batchsize]
-        if contexts is None:
-            yield inputs[excerpt], targets[excerpt]
-        else:
-            yield inputs[excerpt], targets[excerpt], contexts[excerpt]
+        yield inputs[excerpt], targets[excerpt], contexts[excerpt]
 
 
 #  ########################## Build Pairwise Pattern ###############################
 
+def build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m, num_classes):
+    input_layer = lasagne.layers.InputLayer(shape=(None, n),
+                                        input_var=input_var)
+    phi = build_linear_simple( input_layer, m, name="phi")
+    psi = build_linear_simple( phi, num_classes, 
+        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
+    
+    #beta = build_linear_simple( phi, , m, name="beta")
+    beta = None
+        
+    pptp = concarne.patterns.PairwisePredictTransformationPattern(phi=phi, psi=psi, 
+                                         beta=beta,
+                                         target_var=target_var, 
+                                         context_var=context_var,
+                                         context_transform_var=context_transform_var,
+                                         )
+    return pptp
 
+def iterate_pairwise_transformation_aligned_minibatches(inputs, targets, batchsize, contexts_x, contexts_y, shuffle=False):
+    """ Iterator for pairwise pattern for aligned inputs and contexts
+    
+    The iterator is applicable if the data are in this order
+        x0 - x1' ~ c0    
+        x1 - x2' ~ c1
+        x2 - x3' ~ c2    
+        ...
+    with x_i=inputs, x_j'=contexts_x, c_i=contexts_y
+        
+    That means we have n input and (n-1) context samples
+    """
+    assert len(inputs) == len(targets)
+    indices = np.arange(len(inputs))
 
-
+    if shuffle:
+        np.random.shuffle(indices)
+    
+    for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
+        excerpt = indices[start_idx:start_idx + batchsize]
+        yield inputs[excerpt], targets[excerpt], contexts_x[excerpt], contexts_y[excerpt]
 
 #  ########################## Main ###############################
 
 def main(data, num_epochs=500, batchsize=50):
+#if __name__ == "__main__":
+#    data='pairwise'
+#    num_epochs=500
+#    batchsize=50
+
     #theano.config.on_unused_input = 'ignore'
     
     # Prepare Theano variables for inputs and targets
@@ -147,20 +204,48 @@ def main(data, num_epochs=500, batchsize=50):
     target_var = T.ivector('targets')
     context_var = T.matrix('contexts')
     
+    # number of classes in example
+    num_classes = 2
+    
     pattern = None
+    iterate_context_minibatches = None
+    
     if data == "direct":
         # Load the dataset
-        print("Loading data...")
+        print("Loading direct data...")
         X_train, y_train, C_train, X_val, y_val, X_test, y_test = load_direct_context_dataset()
     
         # input dimension of X
         n = X_train.shape[1]
         # intermediate dimension of C
         m = C_train.shape[1]
-        # number of classes in example
-        num_classes = 2
-        pattern = build_direct_pattern(input_var, target_var, context_var, n, m, num_classes)
 
+        pattern = build_direct_pattern(input_var, target_var, context_var, n, m, num_classes)
+        iterate_context_minibatches = iterate_direct_minibatches
+        iterate_context_minibatches_args = [X_train, y_train, batchsize, C_train, True]
+        train_fn_inputs = [input_var, target_var, context_var]
+    
+        learning_rate=0.0001
+        
+    elif data == "pairwise":
+        # Load the dataset
+        print("Loading pairwise data...")
+        X_train, y_train, CX_train, Cy_train, X_val, y_val, X_test, y_test = load_relative_context_dataset()
+
+        context_transform_var = T.matrix('context_transforms')
+    
+        # input dimension of X
+        n = X_train.shape[1]
+        # intermediate dimension of C
+        m = Cy_train.shape[1]
+
+        pattern = build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m, num_classes)
+        iterate_context_minibatches = iterate_pairwise_transformation_aligned_minibatches
+        iterate_context_minibatches_args  = (X_train, y_train, batchsize, CX_train, Cy_train, True)
+        train_fn_inputs = [input_var, target_var, context_var, context_transform_var]
+        
+        learning_rate=0.0001
+    
     # Get the loss expression for training
     loss = pattern.training_loss()
     loss = loss.mean()
@@ -169,9 +254,8 @@ def main(data, num_epochs=500, batchsize=50):
     # parameters at each training step. Here, we'll use Stochastic Gradient
     # Descent (SGD) with Nesterov momentum, but Lasagne offers plenty more.
     params = lasagne.layers.get_all_params(pattern, trainable=True)
-    #params = dp.get_all_params(trainable=True)
     updates = lasagne.updates.nesterov_momentum(
-            loss, params, learning_rate=0.0001, momentum=0.9)
+            loss, params, learning_rate=learning_rate, momentum=0.9)
 
 
     # Create a loss expression for validation/testing. The crucial difference
@@ -187,7 +271,7 @@ def main(data, num_epochs=500, batchsize=50):
 
     # Compile a function performing a training step on a mini-batch (by giving
     # the updates dictionary) and returning the corresponding training loss:
-    train_fn = theano.function([input_var, target_var, context_var], loss, updates=updates)
+    train_fn = theano.function(train_fn_inputs, loss, updates=updates)
 
     # Compile a second function computing the validation loss and accuracy:
     val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
@@ -200,9 +284,8 @@ def main(data, num_epochs=500, batchsize=50):
         train_err = 0
         train_batches = 0
         start_time = time.time()
-        for batch in iterate_minibatches(X_train, y_train, batchsize, C_train, shuffle=True):
-            inputs, targets, contexts = batch
-            train_err += train_fn(inputs, targets, contexts)
+        for batch in iterate_context_minibatches(*iterate_context_minibatches_args):
+            train_err += train_fn(*batch)
             train_batches += 1
 
         # And a full pass over the validation data:
