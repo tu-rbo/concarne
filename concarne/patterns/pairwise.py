@@ -14,6 +14,96 @@ import lasagne.layers
 
 import numpy as np
 
+class PairwiseTransformationPattern(Pattern):
+    """
+    Base class for all pairwise transformation patterns. The general framework
+    is as follows:
+    
+                   psi
+    x_i ----> s_i ------> y
+         phi      \
+                   \
+    x_j ----> s_j -->  ~c
+         phi       beta
+
+    Note that self.context_var should represent x_j, whereas self.input_var 
+    represents self.x_i. The variable ``c'' in the picture is then represented
+    by context_transform_var.
+    
+    The subclass of this pattern decides what beta looks like.
+    
+
+    Parameters
+    ----------
+    context_transform_var: a Theano variable representing the transformation.
+    """
+  
+    def __init__(self, context_transform_var=None, **kwargs):
+        super(PairwiseTransformationPattern, self).__init__(**kwargs)
+        
+        self.context_transform_var = context_transform_var
+        assert (self.context_transform_var is not None)
+        
+        if self.target_loss is None:
+            assert (self.input_var is not None)
+            assert (self.target_var is not None)
+            self.target_loss = lasagne.objectives.categorical_crossentropy(
+                self.get_psi_output_for(self.input_var), self.target_var
+            ).mean()
+
+        if self.context_loss is None:
+            assert (self.input_var is not None)
+            assert (self.context_var is not None)
+            self.context_loss = lasagne.objectives.squared_error(
+                self.get_beta_output_for(self.input_var, self.context_var), 
+                self.context_transform_var
+            ).mean()
+
+    def get_beta_output_for(self, input_i, input_j, **kwargs):
+        raise NotImplementedError()
+        
+
+class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
+    """
+    The :class:`PairwisePredictTransformationPattern` is a contextual pattern where 
+    c is used as given information about the transformation between pairs
+    of input pairs. The function beta is then used to predict c from a pair
+    (x_i, x_j).
+    
+                   psi
+    x_i ----> s_i ------> y
+         phi      \
+                   \
+    x_j ----> s_j ------> ~c
+         phi       beta(s_i, s_j)
+
+    Note that self.context_var should represent x_j, whereas self.input_var 
+    represents self.x_i. The variable ``c'' in the picture is then represented
+    by context_transform_var.
+    
+
+    Parameters
+    ----------
+    context_transform_var: a Theano variable representing the transformation.
+    """
+  
+    def __init__(self, **kwargs):
+        super(PairwisePredictTransformationPattern, self).__init__(**kwargs)
+
+    def get_beta_output_for(self, input_i, input_j, **kwargs):
+        phi_i_output = self.phi.get_output_for(input_i, **kwargs)
+        phi_j_output = self.phi.get_output_for(input_j, **kwargs)
+        diff = phi_i_output-phi_j_output
+        if self.beta is not None:
+            return self.beta.get_output_for(diff, **kwargs)
+        else:
+            return diff
+
+
+
+
+
+# TODO remove?
 class SiameseLayer(lasagne.layers.Layer):
     def __init__(self, input_var1=None, input_var2=None, concatenation_axis=1, **kwargs):
         super(SiameseLayer, self).__init__(**kwargs)
@@ -72,62 +162,3 @@ class SiameseLayer(lasagne.layers.Layer):
         `NotImplementedError`.
         """
         return np.concatenate( inputs, axis=self.concatenation_axis )
-        
-        
-    
-
-class PairwisePredictTransformationPattern(Pattern):
-    """
-    The :class:`PairwisePredictTransformationPattern` is a contextual pattern where 
-    c is used as given information about the transformation between pairs
-    of input pairs. The function beta is then used to predict c from a pair
-    (x_i, x_j).
-    
-                   psi
-    x_i ----> s_i ------> y
-         phi      \
-                   \
-    x_j ----> s_j ------> ~c
-         phi       beta(s_i, s_j)
-
-    Note that self.context_var should represent x_j, whereas self.input_var 
-    represents self.x_i. The variable ``c'' in the picture is then represented
-    by context_transform_var.
-    
-
-    Parameters
-    ----------
-    context_transform_var: a Theano variable representing the transformation.
-    """
-  
-    def __init__(self, context_transform_var=None, **kwargs):
-        super(PairwisePredictTransformationPattern, self).__init__(**kwargs)
-        
-        self.context_transform_var = context_transform_var
-        assert (self.context_transform_var is not None)
-        
-        if self.target_loss is None:
-            assert (self.input_var is not None)
-            assert (self.target_var is not None)
-            self.target_loss = lasagne.objectives.categorical_crossentropy(
-                self.get_psi_output_for(self.input_var), self.target_var
-            ).mean()
-
-        if self.context_loss is None:
-            assert (self.input_var is not None)
-            assert (self.context_var is not None)
-            self.sx = self.get_phi_output_for(self.input_var)
-            self.sc = self.get_phi_output_for(self.context_var)
-            self.context_loss = lasagne.objectives.squared_error(
-                #self.get_beta_output_for(self.input_var, self.context_var), 
-                self.sx - self.sc,
-                self.context_transform_var
-            ).mean()
-
-#    def get_beta_output_for(self, input_i, input_j, **kwargs):
-#        phi_i_output = self.phi.get_output_for(input_i, **kwargs)
-#        phi_j_output = self.phi.get_output_for(input_j, **kwargs)
-#        if self.beta is not None:
-#            return self.beta.get_output_for([phix_output, phic_output], **kwargs)
-#        else:
-#            return phi_output

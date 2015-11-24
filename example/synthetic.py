@@ -48,6 +48,9 @@ def load_dataset(tr_data, tr_data_url, test_data, test_data_url):
     npz_train = np.load(tr_data)
     npz_test = np.load(test_data)
 
+    # sanity check
+    assert (np.mean (npz_train['R'] - npz_test['R']) == 0.)
+
     X = npz_train['X']
     Y = np.cast['int32'](npz_train['Y'])
     C = npz_train['C']
@@ -156,7 +159,12 @@ def build_pw_transformation_pattern(input_var, target_var, context_var, context_
     psi = build_linear_simple( phi, num_classes, 
         nonlinearity=lasagne.nonlinearities.softmax, name="psi")
     
-    #beta = build_linear_simple( phi, , m, name="beta")
+    # optionally, we can also learn parameters for beta.
+    # here it does not make much sense because all transformations
+    # are linear.
+    #beta = build_linear_simple( phi, m, name="beta")
+    
+    # otherwise, we just set beta=None, which will make beta the identity
     beta = None
         
     pptp = concarne.patterns.PairwisePredictTransformationPattern(phi=phi, psi=psi, 
@@ -227,6 +235,8 @@ def main(data, num_epochs=500, batchsize=50):
     
         learning_rate=0.0001
         
+        loss_weights = {}
+        
     elif data == "pairwise":
         # Load the dataset
         print("Loading pairwise data...")
@@ -245,9 +255,12 @@ def main(data, num_epochs=500, batchsize=50):
         train_fn_inputs = [input_var, target_var, context_var, context_transform_var]
         
         learning_rate=0.0001
+        
+        loss_weights = {'target_weight':0.1, 'context_weight':0.9}
     
+        
     # Get the loss expression for training
-    loss = pattern.training_loss()
+    loss = pattern.training_loss(**loss_weights)
     loss = loss.mean()
 
     # Create update expressions for training, i.e., how to modify the
@@ -256,7 +269,6 @@ def main(data, num_epochs=500, batchsize=50):
     params = lasagne.layers.get_all_params(pattern, trainable=True)
     updates = lasagne.updates.nesterov_momentum(
             loss, params, learning_rate=learning_rate, momentum=0.9)
-
 
     # Create a loss expression for validation/testing. The crucial difference
     # here is that we do a deterministic forward pass through the network,
@@ -322,12 +334,15 @@ def main(data, num_epochs=500, batchsize=50):
     print("  test accuracy:\t\t{:.2f} %".format(
         test_acc / test_batches * 100))
         
+    return pattern
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("data", type=str, help="which data to select", default='direct', choices=['direct', 'embedding', 'pairwise'])
+    parser.add_argument("data", type=str, help="which data to select", 
+                        default='direct', 
+                        choices=['direct', 'embedding', 'pairwise'])
     parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
     parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=50, required=False)
     args = parser.parse_args()
   
-    main(args.data, args.num_epochs, args.batchsize)
+    pattern = main(args.data, args.num_epochs, args.batchsize)
