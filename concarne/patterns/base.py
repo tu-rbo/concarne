@@ -53,7 +53,7 @@ class Pattern(object):
 
     @property
     def output_shape(self):
-        return self.get_output_shape_for(self.phi)
+        return self.get_output_shape_for(self.input_var)
 
     def get_params(self, **tags):
         """
@@ -85,7 +85,11 @@ class Pattern(object):
         -----
         For layers without any parameters, this will return an empty list.
         """
-        return self.psi.get_params(**tags) + self.phi.get_params(**tags) 
+        params = self.psi.get_params(**tags)
+        if self.beta is not None:
+            params += self.beta.get_params(**tags)
+        params += self.phi.get_params(**tags) 
+        return params
 
     def get_output_shape_for(self, input_shape):
         """
@@ -115,6 +119,9 @@ class Pattern(object):
         """
         phi_output_shape = self.phi.get_output_shape_for(input_shape)
         return self.psi.get_output_shape_for(phi_output_shape)
+
+    def get_output(self, **kwargs):
+        return self.get_output_for(self.input_var, **kwargs)
 
     def get_output_for(self, input, **kwargs):
         return self.get_psi_output_for(input, **kwargs)
