@@ -37,7 +37,7 @@ class Pattern(object):
         self.psi = psi
         self.beta = beta
 
-        self.input_layer = phi.input_layer
+        self.input_layer = lasagne.layers.get_all_layers(phi)[0]
         self.input_var = self.input_layer.input_var
         
         self.target_var = target_var
@@ -82,10 +82,11 @@ class Pattern(object):
         -----
         For layers without any parameters, this will return an empty list.
         """
-        params = self.psi.get_params(**tags)
+        params = self.phi.get_params(**tags)
+        params += self.psi.get_params(**tags)
         if self.beta is not None:
             params += self.beta.get_params(**tags)
-        params += self.phi.get_params(**tags) 
+
         return params
 
     def get_output_shape_for(self, input_shape):
@@ -124,14 +125,16 @@ class Pattern(object):
         return self.get_psi_output_for(input, **kwargs)
         
     def get_psi_output_for(self, input, **kwargs):
-        phi_output = self.phi.get_output_for(input, **kwargs)
-        return self.psi.get_output_for(phi_output, **kwargs)
+        #phi_output = self.phi.get_output_for(input, **kwargs)
+        #return self.psi.get_output_for(phi_output, **kwargs)
+        return lasagne.layers.get_output(self.psi, inputs=input)
 
     def get_beta_output_for(self, input, **kwargs):
-        raise NotImplementedError()
+        return lasagne.layers.get_output(self.beta, inputs=input)
 
     def get_phi_output_for(self, input, **kwargs):
-        return self.phi.get_output_for(input, **kwargs)
+        #return self.phi.get_output_for(input, **kwargs)
+        return lasagne.layers.get_output(self.phi, inputs=input)
 
     def training_loss(self, target_weight=0.5, context_weight=0.5):
         return target_weight * self.target_loss \
