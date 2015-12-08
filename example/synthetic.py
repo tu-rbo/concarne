@@ -8,6 +8,18 @@ This example corresponds to the "synthetic data" experiment in the paper
 
 Note that the file is structured very similarly to the MNIST example for
 Lasagne in order to facilitate usage of concarne for Lasagne users.
+
+In order to run the example first install concarne, or run it from the 
+repostory root with the command
+ python -m example/synthetic <parameters>
+
+The script accepts a couple of parameters, e.g.
+  python synthetic.py multiview direct  --num_epochs 500 --batchsize 50
+  
+Run the script with 
+  python synthetic.py --help
+for details
+
 """
 
 from __future__ import print_function
@@ -409,10 +421,10 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
 # ------------------------------------------------------        
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("pattern", type=str, help="which pattern to use", 
+    parser.add_argument("pattern",  nargs='?', type=str, help="which pattern to use", 
                         default='direct', 
                         choices=['direct', 'multitask', 'multiview', 'pairwise'])
-    parser.add_argument("data", type=str, help="which context data to load", 
+    parser.add_argument("data",  nargs='?', type=str, help="which context data to load", 
                         default='direct', 
                         choices=['direct', 'embedding', 'relative'])
     parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
