@@ -133,6 +133,13 @@ def build_conv_net(input_var, input_shape, n_out):
                                         nonlinearity=lasagne.nonlinearities.rectify)
     return network
 
+def build_view_net(input_var, input_shape, n_out):
+    network = lasagne.layers.InputLayer(shape=input_shape, input_var=input_var)
+    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out, nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out, nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out, nonlinearity=lasagne.nonlinearities.rectify)
+    return network
+
 
 def build_classifier(network, n_out):
     return lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out,
@@ -170,28 +177,25 @@ def build_multitask_pattern(input_var, target_var, context_var, input_shape, n_h
     psi = build_classifier(phi, num_classes)
     if discrete:
         beta = build_classifier(phi, n_out_context)
+        context_loss = lasagne.objectives.categorical_crossentropy(lasagne.layers.get_output(beta), context_var).mean()
     else:
         beta = build_regressor(phi, n_out_context)
+        context_loss = lasagne.objectives.squared_error(lasagne.layers.get_output(beta), context_var).mean()
+
     return concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta, target_var=target_var,
-                                              context_var=context_var)
+                                              context_var=context_var, context_loss=context_loss)
+
 
 
 #  ########################## Build Multi-view Pattern ###############################
-def build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_classes):
-    input_layer = lasagne.layers.InputLayer(shape=(None, n),
-                                            input_var=input_var)
-    context_input_layer = lasagne.layers.InputLayer(shape=(None, m),
-                                                    input_var=context_var)
-    phi = build_linear_simple(input_layer, d, name="phi")
-    psi = build_linear_simple(phi, num_classes,
-                              nonlinearity=lasagne.nonlinearities.softmax, name="psi")
-    beta = build_linear_simple(context_input_layer, d, name="beta")
+def build_multiview_pattern(input_var, target_var, context_var, input_shape, n_hidden, num_classes):
 
-    mtp = concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta,
-                                             target_var=target_var,
-                                             context_var=context_var,
-                                             )
-    return mtp
+    phi = build_conv_net(input_var, input_shape, n_hidden)
+    psi = build_classifier(phi, num_classes)
+    beta = build_view_net(input_var, input_shape, n_hidden)
+
+    return concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta, target_var=target_var,
+                                              context_var=context_var)
 
 
 def training(train_fn, val_fn, iterate_context_minibatches, iterate_context_minibatches_args, X_test, y_test, batchsize,
@@ -284,7 +288,7 @@ def main(pattern, data_representation, training_procedure, num_epochs, batchsize
     print("#Epochs: {}".format(num_epochs))
     print("Batchsize: {}".format(batchsize))
 
-    if pattern == "multi_view":
+    if pattern == "multiview":
         assert (training_procedure == "simultaneous")
 
     iterate_context_minibatches = None
@@ -299,16 +303,20 @@ def main(pattern, data_representation, training_procedure, num_epochs, batchsize
 
     # prepare context data
     if  data_representation == 'discrete':
+
         # discretize context data into 32 classes using kmeans
         kmeans = cluster.KMeans(n_clusters=32, n_init=100)  # init=centers)
         C_train = kmeans.fit_predict(C_train)
         context_var = T.ivector('contexts')
-        if pattern == 'direct':
+
+        if pattern in ['direct', 'multiview']:
+            # for the direct pattern, we need to explicitly apply one-hot representation to the data
             v = T.vector()
             one_hot = theano.function([v], lasagne.utils.one_hot(v))
-            one_hot(C_train)
-            context_var = lasagne.utils.one_hot(context_var)
+            C_train = one_hot(C_train)
+            context_var = T.matrix('contexts')
     else:
+
         # subsample context to have the same dimension as the intermediate representation (required for direct pattern)
         C_train = C_train[:, ::2]
         context_var = T.matrix('contexts')
@@ -316,21 +324,22 @@ def main(pattern, data_representation, training_procedure, num_epochs, batchsize
 
     # ------------------------------------------------------
     # Build pattern
+    learning_rate = 0.003
+    loss_weights_simultaneous = {} # defaults to uniform weighting
     if pattern == "direct":
         pattern = build_direct_pattern(input_var, target_var, context_var, input_shape=(batchsize, 1, 32, 32),
                                        n_hidden=32, num_classes=num_classes)
-        learning_rate = 0.003
-        loss_weights_simultaneous = {}
 
     elif pattern == "multitask":
         pattern = build_multitask_pattern(input_var, target_var, context_var,
                                           input_shape=(batchsize, 1, 32, 32), n_hidden=32, num_classes=num_classes,
                                           n_out_context=32, discrete=data_representation == 'discrete')
-        learning_rate = 0.003
-        loss_weights_simultaneous = {}
 
     elif pattern == "multiview":
-        return
+        pattern = build_multitask_pattern(input_var, target_var, context_var,
+                                          input_shape=(batchsize, 1, 32, 32), n_hidden=32, num_classes=num_classes,
+                                          n_out_context=32, discrete=data_representation == 'discrete')
+        loss_weights_simultaneous = {'target_weight': 0.99, 'context_weight': 0.01}
 
     else:
         print("Pattern {} not implemented.".format(pattern))
@@ -386,7 +395,7 @@ def main(pattern, data_representation, training_procedure, num_epochs, batchsize
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("pattern", type=str, help="which pattern to use",
-                        default='direct', nargs='?',
+                        default='multiview', nargs='?',
                         choices=['direct', 'multitask', 'multiview'])
     parser.add_argument("data_representation", type=str, help="which context data to load",
                         default='discrete', nargs='?',
