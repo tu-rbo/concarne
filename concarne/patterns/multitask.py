@@ -23,7 +23,8 @@ class MultiTaskPattern(Pattern):
                \
                 ---> c
     """ 
-  
+
+    # TODO: parameters kwargs are hidden ... :(
     def __init__(self, **kwargs):
         super(MultiTaskPattern, self).__init__(**kwargs)
 

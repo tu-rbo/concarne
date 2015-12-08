@@ -10,20 +10,17 @@ Lasagne in order to facilitate usage of concarne for Lasagne users.
 """
 
 from __future__ import print_function
-
 import concarne
 import concarne.patterns
-
 import lasagne
 import theano
 import theano.tensor as T
-
 import numpy as np
-
 import argparse
 import os
 import sys
 import time
+from sklearn import cluster
 
 
 def min_num_per_label(labels, possible_labels):
@@ -99,10 +96,12 @@ def load_dataset(data_file, data_url):
 
     return npz, (X_train, y_train, C_train, X_test, y_test, num_classes)
 
+
 def load_handwritten_data():
     data_file = 'data.npz'
     data_url = ''
     return load_dataset(data_file, data_url)[1]
+
 
 def load_handwritten_data_easy():
     data_file = 'data_easy.npz'
@@ -124,27 +123,32 @@ def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
         yield inputs[excerpt], targets[excerpt]
 
 
-def build_phi(input_var, input_shape, n_hidden):
+def build_conv_net(input_var, input_shape, n_out):
     network = lasagne.layers.InputLayer(shape=input_shape, input_var=input_var)
     network = lasagne.layers.Conv2DLayer(network, 32, (5, 5), nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, 2)
     network = lasagne.layers.Conv2DLayer(network, 32, (5, 5), nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, 2)
-    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_hidden, nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out,
+                                        nonlinearity=lasagne.nonlinearities.rectify)
     return network
 
 
-def build_psi(phi, n_out):
-    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(phi, p=0.5), num_units=n_out, nonlinearity=lasagne.nonlinearities.softmax)
-    return network
+def build_classifier(network, n_out):
+    return lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out,
+                              nonlinearity=lasagne.nonlinearities.softmax)
+
+
+def build_regressor(network, n_out):
+    return lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out,
+                              nonlinearity=lasagne.nonlinearities.linear)
 
 
 # ########################## Build Direct Pattern ###############################
 def build_direct_pattern(input_var, target_var, context_var, input_shape, n_hidden, num_classes):
-    phi = build_phi(input_var, input_shape, n_hidden)
-    psi = build_psi(phi, num_classes)
-    dp = concarne.patterns.DirectPattern(phi=phi, psi=psi, target_var=target_var, context_var=context_var)
-    return dp
+    phi = build_conv_net(input_var, input_shape, n_hidden)
+    psi = build_classifier(phi, num_classes)
+    return concarne.patterns.DirectPattern(phi=phi, psi=psi, target_var=target_var, context_var=context_var)
 
 
 def iterate_direct_minibatches(inputs, targets, batchsize, contexts, shuffle=False):
@@ -160,19 +164,16 @@ def iterate_direct_minibatches(inputs, targets, batchsize, contexts, shuffle=Fal
 
 
 # ########################## Build Multi-task Pattern ###############################
-def build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_classes):
-    input_layer = lasagne.layers.InputLayer(shape=(None, n),
-                                            input_var=input_var)
-    phi = build_linear_simple(input_layer, d, name="phi")
-    psi = build_linear_simple(phi, num_classes,
-                              nonlinearity=lasagne.nonlinearities.softmax, name="psi")
-    beta = build_linear_simple(phi, m, name="beta")
-
-    mtp = concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta,
-                                             target_var=target_var,
-                                             context_var=context_var,
-                                             )
-    return mtp
+def build_multitask_pattern(input_var, target_var, context_var, input_shape, n_hidden, num_classes, n_out_context,
+                            discrete=True):
+    phi = build_conv_net(input_var, input_shape, n_hidden)
+    psi = build_classifier(phi, num_classes)
+    if discrete:
+        beta = build_classifier(phi, n_out_context)
+    else:
+        beta = build_regressor(phi, n_out_context)
+    return concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta, target_var=target_var,
+                                              context_var=context_var)
 
 
 #  ########################## Build Multi-view Pattern ###############################
@@ -193,166 +194,8 @@ def build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_cla
     return mtp
 
 
-#  ########################## Build Pairwise Pattern ###############################
-def build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m, num_classes):
-    input_layer = lasagne.layers.InputLayer(shape=(None, n),
-                                            input_var=input_var)
-    phi = build_linear_simple(input_layer, m, name="phi")
-    psi = build_linear_simple(phi, num_classes,
-                              nonlinearity=lasagne.nonlinearities.softmax, name="psi")
-
-    # optionally, we can also learn parameters for beta.
-    # here it does not make much sense because all transformations
-    # are linear.
-    # beta = build_linear_simple( phi, m, name="beta")
-
-    # otherwise, we just set beta=None, which will make beta the identity
-    beta = None
-
-    pptp = concarne.patterns.PairwisePredictTransformationPattern(phi=phi, psi=psi,
-                                                                  beta=beta,
-                                                                  target_var=target_var,
-                                                                  context_var=context_var,
-                                                                  context_transform_var=context_transform_var,
-                                                                  )
-    return pptp
-
-
-def iterate_pairwise_transformation_aligned_minibatches(inputs, targets, batchsize, contexts_x, contexts_y,
-                                                        shuffle=False):
-    """ Iterator for pairwise pattern for aligned inputs and contexts
-
-    The iterator is applicable if the data are in this order
-        x0 - x1' ~ c0
-        x1 - x2' ~ c1
-        x2 - x3' ~ c2
-        ...
-    with x_i=inputs, x_j'=contexts_x, c_i=contexts_y
-
-    That means we have n input and (n-1) context samples
-    """
-    assert len(inputs) == len(targets)
-    indices = np.arange(len(inputs))
-
-    if shuffle:
-        np.random.shuffle(indices)
-
-    for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
-        excerpt = indices[start_idx:start_idx + batchsize]
-        yield inputs[excerpt], targets[excerpt], contexts_x[excerpt], contexts_y[excerpt]
-
-
-# ########################## Main ###############################
-def main(pattern, data_representation, training_procedure, num_epochs, batchsize):
-
-    print("Pattern: %s" % pattern)
-
-    if pattern == "multi_view":
-        assert (training_procedure == "simultaneous")
-
-    # ------------------------------------------------------
-    # Prepare Theano variables for inputs and targets
-    input_var = T.tensor4('inputs')
-    target_var = T.ivector('targets')
-    context_var = T.matrix('contexts')
-
-    pattern = None
-    iterate_context_minibatches = None
-
-    # ------------------------------------------------------
-    # Load data and build pattern
-    print("Loading data...")
-    X_train, y_train, C_train, X_test, y_test, num_classes = load_handwritten_data()
-
-    # TODO: subsample context for direct pattern to 32 dimensions
-    pattern = build_direct_pattern(input_var, target_var, context_var, input_shape=(batchsize, 1, 32, 32), n_hidden=64, num_classes=num_classes)
-    learning_rate = 0.003
-    loss_weights = {}
-
-    iterate_context_minibatches = iterate_direct_minibatches
-    iterate_context_minibatches_args = [X_train, y_train, batchsize, C_train, True]
-    train_fn_inputs = [input_var, target_var, context_var]
-
-    # if data == "direct" or data == "embedding":
-    #     # input dimension of X
-    #     n = X_train.shape[1]
-    #     # dimensionality of C
-    #     m = C_train.shape[1]
-    #     # dimensionality of intermediate representation S
-    #     d = 1
-    #
-    #     if pattern_type == "direct":
-    #         # d == m
-    #         pattern = build_direct_pattern(input_var, target_var, context_var, n, m, num_classes)
-    #         learning_rate = 0.0001
-    #         loss_weights = {}
-    #
-    #     elif pattern_type == "multitask":
-    #         pattern = build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_classes)
-    #         learning_rate = 0.001
-    #         loss_weights = {'target_weight': 0.9, 'context_weight': 0.1}
-    #
-    #     elif pattern_type == "multiview":
-    #         pattern = build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_classes)
-    #         learning_rate = 0.001
-    #         loss_weights = {'target_weight': 0.99, 'context_weight': 0.01}
-    #
-    #     iterate_context_minibatches = iterate_direct_minibatches
-    #     iterate_context_minibatches_args = [X_train, y_train, batchsize, C_train, True]
-    #     train_fn_inputs = [input_var, target_var, context_var]
-    #
-    #
-    # elif data == "relative":
-    #     # Load the dataset
-    #     print("Loading relative data...")
-    #     X_train, y_train, CX_train, Cy_train, X_val, y_val, X_test, y_test = load_relative_context_dataset()
-    #
-    #     context_transform_var = T.matrix('context_transforms')
-    #
-    #     # input dimension of X
-    #     n = X_train.shape[1]
-    #     # intermediate dimension of C
-    #     m = Cy_train.shape[1]
-    #
-    #     pattern = build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m,
-    #                                               num_classes)
-    #     iterate_context_minibatches = iterate_pairwise_transformation_aligned_minibatches
-    #     iterate_context_minibatches_args = (X_train, y_train, batchsize, CX_train, Cy_train, True)
-    #     train_fn_inputs = [input_var, target_var, context_var, context_transform_var]
-    #
-    #     learning_rate = 0.0001
-    #     loss_weights = {'target_weight': 0.1, 'context_weight': 0.9}
-
-    # ------------------------------------------------------
-    # Get the loss expression for training
-    loss = pattern.training_loss(**loss_weights).mean()
-
-    # Create update expressions for training, i.e., how to modify the
-    # parameters at each training step. Here, we'll use Stochastic Gradient
-    # Descent (SGD) with Nesterov momentum, but Lasagne offers plenty more.
-    params = lasagne.layers.get_all_params(pattern, trainable=True)
-    updates = lasagne.updates.nesterov_momentum(
-        loss, params, learning_rate=learning_rate, momentum=0.9)
-
-    # Create a loss expression for validation/testing. The crucial difference
-    # here is that we do a deterministic forward pass through the network,
-    # disabling dropout layers.
-    test_prediction = lasagne.layers.get_output(pattern, deterministic=True)
-    test_loss = lasagne.objectives.categorical_crossentropy(test_prediction,
-                                                            target_var).mean()
-    # As a bonus, also create an expression for the classification accuracy:
-    test_acc = T.mean(T.eq(T.argmax(test_prediction, axis=1), target_var),
-                      dtype=theano.config.floatX)
-
-    # Compile a function performing a training step on a mini-batch (by giving
-    # the updates dictionary) and returning the corresponding training loss:
-    train_fn = theano.function(train_fn_inputs, loss, updates=updates)
-
-    # Compile a second function computing the validation loss and accuracy:
-    val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
-
-    # ------------------------------------------------------
-    # Finally, launch the training loop.
+def training(train_fn, val_fn, iterate_context_minibatches, iterate_context_minibatches_args, X_test, y_test, batchsize,
+             num_epochs):
     print("Starting training...")
     # We iterate over epochs:
     for epoch in range(num_epochs):
@@ -387,16 +230,155 @@ def main(pattern, data_representation, training_procedure, num_epochs, batchsize
     test_err = 0
     test_acc = 0
     test_batches = 0
-    for batch in iterate_minibatches(X_test, y_test, 500, shuffle=False):
+    for batch in iterate_minibatches(X_test, y_test, batchsize, shuffle=False):
         inputs, targets = batch
         err, acc = val_fn(inputs, targets)
         test_err += err
         test_acc += acc
         test_batches += 1
-    print("Final results:")
-    print("  test loss:\t\t\t{:.6f}".format(test_err / test_batches))
-    print("  test accuracy:\t\t{:.2f} %".format(
-        test_acc / test_batches * 100))
+
+    if test_batches > 0:
+        print("Final results:")
+        print("  test loss:\t\t\t{:.6f}".format(test_err / test_batches))
+        print("  test accuracy:\t\t{:.2f} %".format(
+            test_acc / test_batches * 100))
+
+
+def compile_everything(pattern, input_var, target_var, train_fn_inputs, loss_weights, learning_rate, tags):
+    # ------------------------------------------------------
+    # Get the loss expression for training
+    loss = pattern.training_loss(**loss_weights).mean()
+
+    # Create update expressions for training, i.e., how to modify the
+    # parameters at each training step. Here, we'll use Stochastic Gradient
+    # Descent (SGD) with Nesterov momentum, but Lasagne offers plenty more.
+    params = lasagne.layers.get_all_params(pattern, trainable=True, **tags)
+    updates = lasagne.updates.nesterov_momentum(
+        loss, params, learning_rate=learning_rate, momentum=0.9)
+
+    # Create a loss expression for validation/testing. The crucial difference
+    # here is that we do a deterministic forward pass through the network,
+    # disabling dropout layers.
+    test_prediction = lasagne.layers.get_output(pattern, deterministic=True)
+    test_loss = lasagne.objectives.categorical_crossentropy(test_prediction,
+                                                            target_var).mean()
+    # As a bonus, also create an expression for the classification accuracy:
+    test_acc = T.mean(T.eq(T.argmax(test_prediction, axis=1), target_var),
+                      dtype=theano.config.floatX)
+
+    # Compile a function performing a training step on a mini-batch (by giving
+    # the updates dictionary) and returning the corresponding training loss:
+    train_fn = theano.function(train_fn_inputs, loss, updates=updates)
+
+    # Compile a second function computing the validation loss and accuracy:
+    val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
+
+    return train_fn, val_fn
+
+
+# ########################## Main ###############################
+def main(pattern, data_representation, training_procedure, num_epochs, batchsize):
+    print("Pattern: {}".format(pattern))
+    print("Data representation: {}".format(data_representation))
+    print("Training procedure: {}".format(training_procedure))
+    print("#Epochs: {}".format(num_epochs))
+    print("Batchsize: {}".format(batchsize))
+
+    if pattern == "multi_view":
+        assert (training_procedure == "simultaneous")
+
+    iterate_context_minibatches = None
+
+    # ------------------------------------------------------
+    # Load data and prepare Theano variables
+    print("Loading data...")
+    X_train, y_train, C_train, X_test, y_test, num_classes = load_handwritten_data()
+
+    input_var = T.tensor4('inputs')
+    target_var = T.ivector('targets')
+
+    # prepare context data
+    if  data_representation == 'discrete':
+        # discretize context data into 32 classes using kmeans
+        kmeans = cluster.KMeans(n_clusters=32, n_init=100)  # init=centers)
+        C_train = kmeans.fit_predict(C_train)
+        context_var = T.ivector('contexts')
+        if pattern == 'direct':
+            v = T.vector()
+            one_hot = theano.function([v], lasagne.utils.one_hot(v))
+            one_hot(C_train)
+            context_var = lasagne.utils.one_hot(context_var)
+    else:
+        # subsample context to have the same dimension as the intermediate representation (required for direct pattern)
+        C_train = C_train[:, ::2]
+        context_var = T.matrix('contexts')
+
+
+    # ------------------------------------------------------
+    # Build pattern
+    if pattern == "direct":
+        pattern = build_direct_pattern(input_var, target_var, context_var, input_shape=(batchsize, 1, 32, 32),
+                                       n_hidden=32, num_classes=num_classes)
+        learning_rate = 0.003
+        loss_weights_simultaneous = {}
+
+    elif pattern == "multitask":
+        pattern = build_multitask_pattern(input_var, target_var, context_var,
+                                          input_shape=(batchsize, 1, 32, 32), n_hidden=32, num_classes=num_classes,
+                                          n_out_context=32, discrete=data_representation == 'discrete')
+        learning_rate = 0.003
+        loss_weights_simultaneous = {}
+
+    elif pattern == "multiview":
+        return
+
+    else:
+        print("Pattern {} not implemented.".format(pattern))
+        return
+
+    iterate_context_minibatches = iterate_direct_minibatches
+    iterate_context_minibatches_args = [X_train, y_train, batchsize, C_train, True]
+    train_fn_inputs = [input_var, target_var, context_var]
+
+    tags = {}
+
+    if training_procedure in ['decoupled', 'pretrain_finetune']:
+
+        # DECOUPLED = PRETRAIN
+        print('I will train phi and beta optimizing the contextual objective.')
+        train_fn, val_fn = compile_everything(pattern, input_var, target_var, train_fn_inputs,
+                                              {'target_weight': 0.0, 'context_weight': 1.0}, learning_rate,
+                                              {'psi': False})
+        training(train_fn, val_fn, iterate_context_minibatches, iterate_context_minibatches_args, X_test, y_test,
+                 batchsize, num_epochs)
+
+        print('I will train psi optimizing the target objective.')
+        train_fn, val_fn = compile_everything(pattern, input_var, target_var, train_fn_inputs,
+                                              {'target_weight': 1.0, 'context_weight': 0.0}, learning_rate,
+                                              {'psi': True})
+        training(train_fn, val_fn, iterate_context_minibatches, iterate_context_minibatches_args, X_test, y_test,
+                 batchsize, num_epochs)
+
+        # FINETUNE
+        if training_procedure == 'pretrain_finetune':
+            print('I will finetune phi and psi optimizing the target objective.')
+            train_fn, val_fn = compile_everything(pattern, input_var, target_var, train_fn_inputs,
+                                                  {'target_weight': 1.0, 'context_weight': 0.0}, learning_rate,
+                                                  {'beta': False})
+            training(train_fn, val_fn, iterate_context_minibatches, iterate_context_minibatches_args, X_test, y_test,
+                     batchsize, num_epochs)
+
+    elif training_procedure == 'simultaneous':
+
+        # SIMULTANEOUS
+        print('I will simultaneously train phi, psi, and beta optimizing a weighted sum of the objectives.')
+        train_fn, val_fn = compile_everything(pattern, input_var, target_var, train_fn_inputs,
+                                              loss_weights_simultaneous, learning_rate, {})
+        training(train_fn, val_fn, iterate_context_minibatches, iterate_context_minibatches_args, X_test, y_test,
+                 batchsize, num_epochs)
+
+    else:
+        print('WARNING: Unknown training procedure {}'.format(training_procedure))
 
     return pattern
 
@@ -410,10 +392,10 @@ if __name__ == '__main__':
                         default='discrete', nargs='?',
                         choices=['continuous', 'discrete'])
     parser.add_argument("training_procedure", type=str, help="which training procedure to use",
-                        default='pretrain_finetune', nargs='?',
+                        default='simultaneous', nargs='?',
                         choices=['decoupled', 'pretrain_finetune', 'simultaneous'])
-    parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
-    parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=50, required=False)
+    parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=3, required=False)
+    parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=20, required=False)
     args = parser.parse_args()
 
     pattern = main(args.pattern, args.data_representation, args.training_procedure, args.num_epochs, args.batchsize)
