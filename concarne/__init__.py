@@ -14,4 +14,4 @@ else:
 #from . import nonlinearities
 
 
-__version__ = "0.1.dev1"
+__version__ = "0.1.dev2"
