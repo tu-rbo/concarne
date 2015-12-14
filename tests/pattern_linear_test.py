@@ -28,11 +28,18 @@ class TestBase(object):
         self.loss_weights = {'target_weight':0.9, 'context_weight':0.1}
     
     def setup(self):
+        # generate input data
         self.X = np.array( [[0,1,2,3,4], [1,1,1,1,1]]).T
-        self.S = self.X[:,:1]
+        # generate targets (FIXME currently unused)
         self.Y = np.array( [0, 0, 1, 1, 1], dtype='int32' )
+
+        # generate desired representation
+        self.S = self.X[:,:1]
         
+        # dim of input
         self.n = self.X.shape[1]
+        # dim of output (dim=1, but 2 classes!)
+        self.num_classes = 2
         
         self.init_variables()
         self.build_pattern()
@@ -40,20 +47,19 @@ class TestBase(object):
     def init_variables(self):
         self.input_var = T.matrix('inputs')
         self.context_var = T.matrix('contexts')
-        #self.num_classes = 2
-        #self.target_var = T.ivector('targets')
         # do regression
-        self.num_classes = 1
+        #self.target_var = T.ivector('targets')
         self.target_var = T.vector('targets')
+        self.num_classes = 1 # regression -> dim matters, not classes
 
     def build_pattern(self):
+        """Implemented by derived classes"""
         raise NotImplemented()
 
     def build_target_loss(self):
         phi_output = self.phi.get_output_for(self.input_var)
         psi_output = self.psi.get_output_for(phi_output).reshape((-1,))
         self.target_loss = lasagne.objectives.squared_error(psi_output, self.target_var).mean()
-
 
 # ------------------------------------------------------------------------------
 
@@ -63,6 +69,7 @@ class TestDirectPattern(TestBase):
     """
 
     def setup(self):
+        # define direct context data
         self.C = np.array( [[0,1,2,3,4], ] ).T
         self.m = self.C.shape[1]
     
@@ -78,16 +85,11 @@ class TestDirectPattern(TestBase):
             name="psi")
             
         self.build_target_loss()
-    
-#        phi_output = self.phi.get_output_for(self.input_var)
-#        psi_output = self.psi.get_output_for(phi_output).reshape((-1,))
         
         self.pattern = concarne.patterns.DirectPattern(phi=self.phi, psi=self.psi, 
                                              target_var=self.target_var, 
                                              context_var=self.context_var,
-                                             target_loss=self.target_loss #lasagne.objectives.squared_error(
-#                                                             psi_output,
-#                                                             self.target_var).mean()
+                                             target_loss=self.target_loss
                                              )
 
     def test_pattern_output(self):
@@ -133,10 +135,13 @@ class TestMultiViewPattern(TestBase):
     """
 
     def setup(self):
-        # embedded C
+        # define embedded C
         self.C = np.array( [[0,1,2,3,4], [2,2,2,2,2]] ).T
         
+        # dim of context
         self.m = self.C.shape[1]
+        
+        # size of desired intermediate representation
         self.d = 1
 
         super(TestMultiViewPattern, self).setup()
@@ -206,6 +211,8 @@ class TestMultiViewPattern(TestBase):
 
 # ------------------------------------------------------------------------------
     
+    
+
 if __name__ == "__main__":
     td = TestDirectPattern()
     td.setup()
