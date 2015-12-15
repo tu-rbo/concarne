@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import concarne
 import concarne.patterns
+import concarne.iterators
 
 import lasagne
 import theano
@@ -96,6 +97,47 @@ class TestSinglePatternBase(TestPatternBase):
         lst = T.grad(loss, params)
         assert (len (lst) == len (params))
         
+
+    def _test_learn(self):
+        loss = self.pattern.training_loss(**self.loss_weights).mean()
+        train_fn_inputs = [self.input_var, self.target_var, self.context_var]
+        
+        params = lasagne.layers.get_all_params(self.pattern, trainable=True)
+        
+        updates = lasagne.updates.nesterov_momentum(
+                loss, params, learning_rate=1e-5, momentum=0.9)
+        
+        train_fn = theano.function(train_fn_inputs, loss, updates=updates)
+        #assert (train_fn(self.X, self.Y, self.C) > 0)
+        
+#        test_prediction = lasagne.layers.get_output(self.pattern, deterministic=True)
+#        test_loss = lasagne.objectives.categorical_crossentropy(test_prediction,
+#                                                                self.target_var)
+#        test_loss = test_loss.mean()
+#        # As a bonus, also create an expression for the classification accuracy:
+##        test_acc = T.mean(T.eq(T.argmax(test_prediction, axis=1), self.target_var),
+##                          dtype=theano.config.floatX)
+#        test_fn = theano.function([self.input_var, self.target_var], test_loss)
+        
+        num_epochs = 1000
+        for epoch in range(num_epochs):
+            train_err = 0
+            train_batches = 0
+            sit = concarne.iterators.SimpleBatchIterator(2)
+            for X, Y, C in sit(self.X, self.Y, self.C):
+                train_err += train_fn(X,Y,C)
+                train_batches += 1
+
+        # we cannot guarantee any training or test error here
+        # we are simply happy if the iteration didn't crash
+
+#            print("Epoch {} of {}".format(
+#                epoch + 1, num_epochs, ))
+#            print("  training loss:\t\t{:.6f}".format(train_err / train_batches))
+#        
+#        assert (train_err < 1e-5)
+
+        
 # ------------------------------------------------------------------------------
 
 class TestDirectPattern(TestSinglePatternBase):
@@ -146,6 +188,8 @@ class TestDirectPattern(TestSinglePatternBase):
     def test_pattern_training_loss_and_grads(self):
         self._test_pattern_training_loss_and_grads()
         
+    def test_learn(self):
+        self._test_learn()
 
 # ------------------------------------------------------------------------------
 
@@ -210,6 +254,9 @@ class TestMultiViewPattern(TestSinglePatternBase):
 
     def test_pattern_training_loss_and_grads(self):
         self._test_pattern_training_loss_and_grads()
+
+    def test_learn(self):
+        self._test_learn()
 
 # ------------------------------------------------------------------------------
 
@@ -277,6 +324,8 @@ class TestMultiTaskPattern(TestSinglePatternBase):
     def test_pattern_training_loss_and_grads(self):
         self._test_pattern_training_loss_and_grads()
 
+    def test_learn(self):
+        self._test_learn()
 
 
 # ------------------------------------------------------------------------------
@@ -373,6 +422,6 @@ class TestPWTransformationPattern(TestPatternBase):
 
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    td = TestPWTransformationPattern()
+    td = TestDirectPattern()
     td.setup()
-    td.test_pattern_output()
+    td.test_learn()
