@@ -24,22 +24,34 @@ class MultiTaskPattern(Pattern):
                 ---> c
     """ 
   
+    @property
+    def default_target_objective(self):
+        return lasagne.objectives.categorical_crossentropy  
+  
+    @property  
+    def default_context_objective(self):
+        return lasagne.objectives.squared_error
+
     def __init__(self, **kwargs):
         super(MultiTaskPattern, self).__init__(**kwargs)
 
         assert(self.beta is not None)
 
-        if self.target_loss is None:
-            assert (self.input_var is not None)
-            assert (self.target_var is not None)
-            self.target_loss = lasagne.objectives.categorical_crossentropy(
-                self.get_psi_output_for(self.input_var), self.target_var
-            ).mean()
+        self._create_target_objective()
+        self._create_context_objective()                                     
 
+    def _create_context_objective(self):
         if self.context_loss is None:
             assert (self.input_var is not None)
             assert (self.context_var is not None)
-            self.context_loss = lasagne.objectives.squared_error(
+            
+            if self.context_loss_fn is None:
+                fn = self.default_context_objective
+            else:
+                #print ("Context loss is function object: %s" % str(self.context_loss_fn))
+                fn = self.context_loss_fn
+            
+            self.context_loss = fn(
                 self.get_beta_output_for(self.input_var), self.context_var
             ).mean()
             

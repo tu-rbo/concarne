@@ -103,7 +103,7 @@ class Pattern(object):
             if self.target_loss_fn is None:
                 fn = self.default_target_objective
             else:
-                print ("Target loss is function object: %s" % str(self.target_loss_fn))
+                #print ("Target loss is function object: %s" % str(self.target_loss_fn))
                 fn = self.target_loss_fn
             
             # define target loss

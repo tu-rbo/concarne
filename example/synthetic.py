@@ -163,6 +163,7 @@ def build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_cla
     mtp = concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta,
                                          target_var=target_var, 
                                          context_var=context_var,
+                                         context_loss=lasagne.objectives.squared_error,
                                          )
     return mtp
     
@@ -180,6 +181,7 @@ def build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_cla
     mtp = concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta,
                                          target_var=target_var, 
                                          context_var=context_var,
+                                         context_loss=lasagne.objectives.squared_error,
                                          )
     return mtp    
     
@@ -292,7 +294,7 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
         m = Cy_train.shape[1]
 
         pattern = build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m, num_classes)
-        iterate_context_minibatches = concarne.iterators.DualContextBatchIterator(batchsize, True)
+        iterate_context_minibatches = concarne.iterators.AlignedBatchIterator(batchsize, True)
         iterate_context_minibatches_args = [X_train, y_train, CX_train, Cy_train]
         train_fn_inputs = [input_var, target_var, context_var, context_transform_var]
         

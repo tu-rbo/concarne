@@ -45,7 +45,7 @@ class DirectPattern(Pattern):
             if self.context_loss_fn is None:
                 fn = self.default_context_objective
             else:
-                print ("Target loss is function object: %s" % str(self.context_loss))
+                #print ("Context loss is function object: %s" % str(self.context_loss_fn))
                 fn = self.context_loss_fn
             
             self.context_loss = fn(
