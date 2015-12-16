@@ -120,19 +120,6 @@ def build_linear_simple(input_layer, n_out, nonlinearity=None, name=None):
     network = lasagne.layers.DenseLayer(input_layer, n_out, nonlinearity=nonlinearity, b=None, name=name)
     return network    
 
-def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
-    """ Simple iterator for direct pattern """
-    assert len(inputs) == len(targets)
-    indices = np.arange(len(inputs))
-
-    if shuffle:
-        np.random.shuffle(indices)
-    
-    for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
-        excerpt = indices[start_idx:start_idx + batchsize]
-        yield inputs[excerpt], targets[excerpt]
-
-
 #  ########################## Build Direct Pattern ###############################
 def build_direct_pattern(input_var, target_var, context_var, n, m, num_classes):
     input_layer = lasagne.layers.InputLayer(shape=(None, n),
@@ -157,19 +144,6 @@ def build_direct_pattern(input_var, target_var, context_var, n, m, num_classes):
                                          #context_loss=context_loss.mean()
                                          )
     return dp
-
-def iterate_direct_minibatches(inputs, targets, batchsize, contexts, shuffle=False):
-    """ Simple iterator for direct pattern """
-    assert len(inputs) == len(targets)
-    indices = np.arange(len(inputs))
-
-    if shuffle:
-        np.random.shuffle(indices)
-    
-    for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
-        excerpt = indices[start_idx:start_idx + batchsize]
-        yield inputs[excerpt], targets[excerpt], contexts[excerpt]
-
 
 #  ########################## Build Multi-task Pattern ###############################
 def build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_classes):
@@ -228,27 +202,6 @@ def build_pw_transformation_pattern(input_var, target_var, context_var, context_
                                          )
     return pptp
 
-def iterate_pairwise_transformation_aligned_minibatches(inputs, targets, batchsize, contexts_x, contexts_y, shuffle=False):
-    """ Iterator for pairwise pattern for aligned inputs and contexts
-    
-    The iterator is applicable if the data are in this order
-        x0 - x1' ~ c0    
-        x1 - x2' ~ c1
-        x2 - x3' ~ c2    
-        ...
-    with x_i=inputs, x_j'=contexts_x, c_i=contexts_y
-        
-    That means we have n input and (n-1) context samples
-    """
-    assert len(inputs) == len(targets)
-    indices = np.arange(len(inputs))
-
-    if shuffle:
-        np.random.shuffle(indices)
-    
-    for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
-        excerpt = indices[start_idx:start_idx + batchsize]
-        yield inputs[excerpt], targets[excerpt], contexts_x[excerpt], contexts_y[excerpt]
 
 #  ########################## Main ###############################
 
@@ -387,7 +340,8 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
         val_err = 0
         val_acc = 0
         val_batches = 0
-        for batch in iterate_minibatches(X_val, y_val, batchsize, shuffle=False):
+        sit = concarne.iterators.SimpleBatchIterator(batchsize, shuffle=False)
+        for batch in sit(X_val, y_val):
             inputs, targets = batch
             err, acc = val_fn(inputs, targets)
             val_err += err
@@ -406,7 +360,8 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
     test_err = 0
     test_acc = 0
     test_batches = 0
-    for batch in iterate_minibatches(X_test, y_test, 500, shuffle=False):
+    sit = concarne.iterators.SimpleBatchIterator(500, shuffle=False)
+    for batch in sit(X_test, y_test):
         inputs, targets = batch
         err, acc = val_fn(inputs, targets)
         test_err += err
