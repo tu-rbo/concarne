@@ -26,6 +26,7 @@ from __future__ import print_function
 
 import concarne
 import concarne.patterns
+import concarne.iterators
 
 import lasagne
 import theano
@@ -314,8 +315,8 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
           learning_rate=0.001
           loss_weights = {'target_weight':0.99, 'context_weight':0.01}
           
-        iterate_context_minibatches = iterate_direct_minibatches
-        iterate_context_minibatches_args = [X_train, y_train, batchsize, C_train, True]
+        iterate_context_minibatches = concarne.iterators.SimpleBatchIterator(batchsize, True)
+        iterate_context_minibatches_args = [X_train, y_train, C_train]
         train_fn_inputs = [input_var, target_var, context_var]
     
         
@@ -332,8 +333,8 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
         m = Cy_train.shape[1]
 
         pattern = build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m, num_classes)
-        iterate_context_minibatches = iterate_pairwise_transformation_aligned_minibatches
-        iterate_context_minibatches_args  = (X_train, y_train, batchsize, CX_train, Cy_train, True)
+        iterate_context_minibatches = concarne.iterators.DualContextBatchIterator(batchsize, True)
+        iterate_context_minibatches_args = [X_train, y_train, CX_train, Cy_train]
         train_fn_inputs = [input_var, target_var, context_var, context_transform_var]
         
         learning_rate=0.0001        

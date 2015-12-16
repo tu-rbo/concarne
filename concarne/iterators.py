@@ -4,16 +4,12 @@ from collections import OrderedDict
 
 import numpy as np
 
-class _list(list):
-    pass
-
-
-class _dict(dict):
-    def __contains__(self, key):
-        return True
-
+# ---------------------------------------------------------------------------
 
 def dict_slice(arr, sl):
+    """
+    Helper method to slice all arrays contained in a dictionary.
+    """
     if isinstance(arr, dict):
         ret = OrderedDict()
         for k, v in arr.items():
@@ -22,6 +18,7 @@ def dict_slice(arr, sl):
     else:
         return arr[sl]
 
+# ---------------------------------------------------------------------------
 
 class SimpleBatchIterator(object):
     """
@@ -44,6 +41,15 @@ class SimpleBatchIterator(object):
         self.shuffle = shuffle
 
     def __call__(self, X, y, C=None):
+        """
+        Note for developers:
+        The __call__ magic function puts all passed arguments into a dictionary
+        elem_dict which is used for iteration.
+        
+        If you just want to pass more or different arguments to an iterator,
+        the easiest way is to subclass SimpleBatchIterator and overwrite
+        this method adding the desired parameters to the param list / elem_dict
+        """
         self.elem_dict = OrderedDict()
         self.elem_dict['X'] = X
         self.elem_dict['y'] = y
@@ -81,7 +87,12 @@ class SimpleBatchIterator(object):
         return state
         
 
+# ---------------------------------------------------------------------------
+
 class DualContextBatchIterator(SimpleBatchIterator):
+    """
+      Simple iterator class for aligned X,Y,CX and Cy.
+    """
     def __call__(self, X, y, CX, Cy):
         self.elem_dict = OrderedDict()
         self.elem_dict['X'] = X

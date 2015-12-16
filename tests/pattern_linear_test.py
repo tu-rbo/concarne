@@ -420,6 +420,28 @@ class TestPWTransformationPattern(TestPatternBase):
         lst = T.grad(loss, params)
         assert (len (lst) == len (params))
 
+
+    def test_learn(self):
+        loss = self.pattern.training_loss(**self.loss_weights).mean()
+        train_fn_inputs = [self.input_var, self.target_var, self.context_var, self.context_transform_var]
+        
+        params = lasagne.layers.get_all_params(self.pattern, trainable=True)
+        
+        updates = lasagne.updates.nesterov_momentum(
+                loss, params, learning_rate=1e-5, momentum=0.9)
+        
+        train_fn = theano.function(train_fn_inputs, loss, updates=updates)
+        
+        num_epochs = 1000
+        for epoch in range(num_epochs):
+            train_err = 0
+            train_batches = 0
+            sit = concarne.iterators.DualContextBatchIterator(2)
+            for X, Y, CX, Cy in sit(self.X, self.Y, self.CX, self.Cy):
+                train_err += train_fn(X,Y,CX,Cy)
+                train_batches += 1
+                
+                
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
     td = TestDirectPattern()
