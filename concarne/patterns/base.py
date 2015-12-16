@@ -2,6 +2,9 @@ __all__ = ["Pattern"]
 
 import lasagne.objectives
 
+from ..utils import isfunction
+
+
 class Pattern(object):
     """
     The :class:`Pattern` class represents a contextual pattern and
@@ -21,9 +24,11 @@ class Pattern(object):
     context_var: Theano variable representing the target
         The semantics of this variable depend on the pattern.
         Note that additional context variables might be required by a pattern.
-    target_loss: Theano expression for the optimizing the target (optional).
+    target_loss: Theano expression or lasagne objective for the optimizing the 
+        target (optional).
         All patterns have standard objectives applicable here
-    context_loss: Theano expression for the contextual loss (optional).
+    context_loss: Theano expression or lasagne objective for the contextual 
+        loss (optional).
         All patterns have standard objectives applicable here
     name : a string or None
         An optional name to attach to this layer.
@@ -44,9 +49,67 @@ class Pattern(object):
         self.context_var = context_var
 
         self.target_loss = target_loss
+        self.target_loss_fn = None
         self.context_loss = context_loss
+        self.context_loss_fn = None
     
         self.name = name
+        
+        if isfunction(self.target_loss):
+            self.target_loss_fn = self.target_loss
+            self.target_loss = None
+        if isfunction(self.context_loss):
+            self.context_loss_fn = self.context_loss
+            self.context_loss = None
+            
+    @property
+    def default_target_objective(self):
+        """
+            Return the default target objective used by this pattern.
+            
+            The target objective can be overridden by passing the 
+            target_loss argument to the constructor of a pattern
+        """
+        raise NotImplemented()
+  
+  
+    @property  
+    def default_context_objective(self):
+        """
+            Return the default contextual objective used by this pattern.
+            
+            The contextual objective can be overridden by passing the 
+            context_loss argument to the constructor of a pattern
+        """
+        raise NotImplemented()
+  
+    def _create_target_objective(self, output=None, target=None):
+        """
+            Helper function that should be called by constructor to build
+            the member variable target_loss.
+            
+            Should be called by the constructor
+        """
+        
+        if output is None:
+            output = self.get_psi_output_for(self.input_var)
+        if target is None:
+            target = self.target_var            
+        
+        if self.target_loss is None:
+            assert (self.input_var is not None)
+            assert (self.target_var is not None)
+            
+            if self.target_loss_fn is None:
+                fn = self.default_target_objective
+            else:
+                print ("Target loss is function object: %s" % str(self.target_loss_fn))
+                fn = self.target_loss_fn
+            
+            # define target loss
+            self.target_loss = fn(output, target).mean()
+
+                
 
     @property
     def output_shape(self):

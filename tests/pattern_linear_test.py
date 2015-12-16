@@ -123,7 +123,7 @@ class TestSinglePatternBase(TestPatternBase):
         for epoch in range(num_epochs):
             train_err = 0
             train_batches = 0
-            sit = concarne.iterators.SimpleBatchIterator(2)
+            sit = concarne.iterators.AlignedBatchIterator(2)
             for X, Y, C in sit(self.X, self.Y, self.C):
                 train_err += train_fn(X,Y,C)
                 train_batches += 1
@@ -436,7 +436,7 @@ class TestPWTransformationPattern(TestPatternBase):
         for epoch in range(num_epochs):
             train_err = 0
             train_batches = 0
-            sit = concarne.iterators.DualContextBatchIterator(2)
+            sit = concarne.iterators.AlignedBatchIterator(2)
             for X, Y, CX, Cy in sit(self.X, self.Y, self.CX, self.Cy):
                 train_err += train_fn(X,Y,CX,Cy)
                 train_batches += 1
