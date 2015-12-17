@@ -266,6 +266,7 @@ def compile_everything(pattern, input_var, target_var, train_fn_inputs, loss_wei
     test_prediction = lasagne.layers.get_output(pattern, deterministic=True)
     test_loss = lasagne.objectives.categorical_crossentropy(test_prediction,
                                                             target_var).mean()
+
     # As a bonus, also create an expression for the classification accuracy:
     test_acc = T.mean(T.eq(T.argmax(test_prediction, axis=1), target_var),
                       dtype=theano.config.floatX)
