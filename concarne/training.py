@@ -56,7 +56,7 @@ class PatternTrainer(object):
 
        If in your task, you have more (or simply a different amount of)
        contextual data available than labels, you can use the method 
-       :method:`fit_XC_XY`::
+       fit_XC_XY::
        
         > pt.fit_XC_XY(X_train, C_train, X_train2, y_train, X_val=X_val, y_val=y_val)
         
