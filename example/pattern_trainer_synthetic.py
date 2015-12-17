@@ -330,7 +330,7 @@ if __name__ == '__main__':
     parser.add_argument("data",  nargs='?', type=str, help="which context data to load", 
                         default='direct', 
                         choices=['direct', 'embedding', 'relative'])
-    parser.add_argument("--procedure", nargs='?', type=str, help="training procedure", 
+    parser.add_argument("procedure", nargs='?', type=str, help="training procedure", 
                         default='simultaneous', choices=['decoupled', 'simultaneous', 'pretrain_finetune'])
     parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
     parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=50, required=False)
