@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to concarne's documentation!
+concarne - a lightweight contextual learning framework, based on Theano and Lasagne 
 ====================================
 
 Contents:

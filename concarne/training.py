@@ -58,7 +58,7 @@ class PatternTrainer(object):
        contextual data available than labels, you can use the method 
        :method:`fit_XC_XY`::
        
-        > pt.fit_XYC(X_train, C_train, X_train2, y_train, X_val=X_val, y_val=y_val)
+        > pt.fit_XC_XY(X_train, C_train, X_train2, y_train, X_val=X_val, y_val=y_val)
         
        In the simultaneous procedure, instead of jointly optimizing the
        gradient for combined objective, we alternate the computation of the
