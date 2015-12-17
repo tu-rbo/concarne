@@ -283,23 +283,26 @@ class Pattern(object):
     def get_psi_output_for(self, input=None, **kwargs):
         if input is None:
             input = self.input_var
-        return lasagne.layers.get_output(self.psi, inputs=input)
+        return lasagne.layers.get_output(self.psi, inputs=input, **kwargs)
 
     def get_beta_output_for(self, input=None, **kwargs):
         if input is None:
             input = self.input_var
-        return lasagne.layers.get_output(self.beta, inputs=input)
+        return lasagne.layers.get_output(self.beta, inputs=input, **kwargs)
 
     def get_phi_output_for(self, input=None, **kwargs):
         if input is None:
             input = self.input_var
-        return lasagne.layers.get_output(self.phi, inputs=input)
+        return lasagne.layers.get_output(self.phi, inputs=input, **kwargs)
 
     def training_loss(self, target_weight=0.5, context_weight=0.5):
-        if target_weight == 0.:
-            return context_weight * self.context_loss
-        elif context_weight == 0.:
-            return target_weight * self.target_loss
-        else:
-            return target_weight * self.target_loss \
-                + context_weight * self.context_loss
+        # we need to gate because if we set one weight to 0., we might
+        # also want to omit the involved theano variables; w/o the if-else
+        # we get an "unconnected inputs" error in theano
+        loss = 0.
+        if target_weight > 0.:
+            loss += target_weight * self.target_loss
+        if context_weight > 0.:
+            loss += context_weight * self.context_loss
+            
+        return loss

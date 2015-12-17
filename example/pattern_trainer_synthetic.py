@@ -267,11 +267,13 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
           learning_rate=0.0001
           if procedure != "simultaneous":
             learning_rate*=0.1
-          loss_weights = {'target_weight':0.5, 'context_weight':0.5}
+          loss_weights = {} #'target_weight':0.5, 'context_weight':0.5}
 
         elif pattern_type == "multitask":
           pattern = build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_classes)
-          learning_rate=0.001
+          learning_rate=0.0001
+          if procedure != "simultaneous":
+            learning_rate*=0.1
           loss_weights = {'target_weight':0.9, 'context_weight':0.1}
 
         elif pattern_type == "multiview":
@@ -280,7 +282,6 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
           if procedure != "simultaneous":
             learning_rate*=0.01
           loss_weights = {'target_weight':0.99, 'context_weight':0.01}
-
           
         iterate_context_minibatches_args = [X_train, y_train, C_train]
     
@@ -314,9 +315,9 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
                                                batchsize,
                                                momentum,
                                                procedure,
-                                               loss_weights['target_weight'],
-                                               loss_weights['context_weight'],
-                                               verbose=True)
+                                               verbose=True,
+                                               **loss_weights
+                                               )
     print("Starting training...")
     trainer.fit_XYC(*iterate_context_minibatches_args, X_val=X_val, y_val=y_val)
 

@@ -359,7 +359,9 @@ class PatternTrainer(object):
 
             # And a pass over the validation data:
             if X_val is not None and y_val is not None:
-                val_err, val_acc = self.score(X_val, y_val, batch_size=len(X_val))
+                #bs = len(X_val)
+                bs = batch_iterators[-1].batch_size
+                val_err, val_acc = self.score(X_val, y_val, batch_size=bs)
     
             # Then we print the results for this epoch:
             if self.verbose:
