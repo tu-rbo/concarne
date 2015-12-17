@@ -283,7 +283,7 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
             learning_rate*=0.01
           loss_weights = {'target_weight':0.99, 'context_weight':0.01}
           
-        iterate_context_minibatches_args = [X_train, y_train, C_train]
+        iterate_context_minibatches_args = [X_train, y_train, [C_train]]
     
         
     elif data == "relative":

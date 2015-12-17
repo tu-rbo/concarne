@@ -190,8 +190,9 @@ class PatternTrainer(object):
             Input data (rows: samples, cols: features)
         Y :  numpy array
             Labels / target data
-        Cs:  numpy array or list of numpy arrays
-            Context data
+        Cs:  list of numpy arrays/lists
+            Context data - even if the pattern / iterator only expects the
+            value for one context variable, you MUST give a list here
         batch_iterator: iterator, optional
             Your custom iterator class that accepts X,Y,C1,..Cn as inputs
         X_val: numpy array, optional
@@ -199,9 +200,10 @@ class PatternTrainer(object):
         y_val: numpy array, optional
             Validation labeled data
         """
-        # TODO this only holds for AlignedBatchIterator!
-        if not isiterable(Cs) or len(Cs[0]) != len(X):
-            Cs = [Cs]
+
+        if not isiterable(Cs):
+            raise Exception("Make sure that you provide a list of context "
+                + " data Cs, even if the pattern only expects one context variable")
 
         if batch_iterator is None:
             batch_iterator = AlignedBatchIterator(self.batch_size, shuffle=True)
@@ -225,8 +227,9 @@ class PatternTrainer(object):
         X1 :  numpy array
             Input data use for optimizing contextual objective 
             (rows: samples, cols: features)
-        Cs:  numpy array or list of numpy arrays
-            Context data (per default each array should have same len as X1)
+        Cs:  list of numpy arrays/lists
+            Context data - even if the pattern / iterator only expects the
+            value for one context variable, you MUST give a list here
         X1 :  numpy array
             Input data use for optimizing target objective 
             (rows: samples, cols: features)
@@ -241,8 +244,10 @@ class PatternTrainer(object):
         y_val: numpy array, optional
             Validation labeled data
         """
-        if not isiterable(Cs) or len(Cs[0]) != len(X1):
-            Cs = [Cs]
+        
+        if not isiterable(Cs):
+            raise Exception("Make sure that you provide a list of context "
+                + " data Cs, even if the pattern only expects one context variable")
 
         if batch_iterator_XY is None:
             batch_iterator_XY = AlignedBatchIterator(self.batch_size, shuffle=True)
