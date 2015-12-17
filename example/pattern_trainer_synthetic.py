@@ -265,6 +265,8 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
           # d == m
           pattern = build_direct_pattern(input_var, target_var, context_var, n, m, num_classes)
           learning_rate=0.0001
+          if procedure != "simultaneous":
+            learning_rate*=0.1
           loss_weights = {'target_weight':0.5, 'context_weight':0.5}
 
         elif pattern_type == "multitask":
@@ -275,7 +277,10 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
         elif pattern_type == "multiview":
           pattern = build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_classes)
           learning_rate=0.001
+          if procedure != "simultaneous":
+            learning_rate*=0.01
           loss_weights = {'target_weight':0.99, 'context_weight':0.01}
+
           
         iterate_context_minibatches_args = [X_train, y_train, C_train]
     

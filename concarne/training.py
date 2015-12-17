@@ -281,7 +281,8 @@ class PatternTrainer(object):
             train_fn = self._compile_train_fn(self.pattern.training_input_vars,
                                               loss_weights={'target_weight': 0.0, 'context_weight': 1.0}, 
                                               tags= {'psi': False} )
-            self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]], X_val, y_val)
+            # passing X_val and y_val doesn't make sense because psi is not trained
+            self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]])
 
             # second training phase
             if self.procedure == 'decoupled':
