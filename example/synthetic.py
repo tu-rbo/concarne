@@ -131,21 +131,10 @@ def build_direct_pattern(input_var, target_var, context_var, n, m, num_classes):
     phi = build_linear_simple( input_layer, m, name="phi")
     psi = build_linear_simple( phi, num_classes, 
         nonlinearity=lasagne.nonlinearities.softmax, name="psi")
-    
-    # if you want to change the standard loss terms used by a pattern
-    # you can define them here and pass them to the Pattern object
-    #   target_loss=lasagne.objectives.categorical_crossentropy(
-    #       psi.get_output_for(phi.get_output_for(input_var)), 
-    #       target_var)    
-    #   context_loss=lasagne.objectives.squared_error(
-    #       phi.get_output_for(input_var), 
-    #       context_var)
         
-    # alternatively - and even easier - you can also just pass the lasagne
+    # you can also pass the lasagne
     # objective function and the pattern will automatically figure out
     # inputs and outputs:
-    #  target_loss=lasagne.objectives.categorical_crossentropy,
-    #  context_loss=lasagne.objectives.squared_error
         
     dp = concarne.patterns.DirectPattern(phi=phi, psi=psi, 
                                          target_var=target_var, 

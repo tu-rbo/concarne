@@ -47,7 +47,7 @@ class Pattern(object):
         self.psi = psi
         self.beta = beta
 
-        self.input_layer = phi.input_layer
+        self.input_layer = lasagne.layers.get_all_layers(phi)[0]
         self.input_var = self.input_layer.input_var
         
         self.target_var = target_var
@@ -208,10 +208,42 @@ class Pattern(object):
         -----
         For patterns without any parameters, this will return an empty list.
         """
-        params = self.psi.get_params(**tags)
-        if self.beta is not None:
-            params += self.beta.get_params(**tags)
-        params += self.phi.get_params(**tags) 
+
+        # check between tags that belong to the pattern and those that belong to the layers
+        pattern_keys = ['phi', 'psi', 'beta']
+        pattern_tags = dict()
+        layer_tags = dict()
+        for key in tags:
+            if key in pattern_keys:
+                pattern_tags[key] = tags[key]
+            else:
+                layer_tags[key] = tags[key]
+
+        result = ['phi', 'psi', 'beta']
+
+        only = set(tag for tag, value in pattern_tags.items() if value)
+        if only:
+            if len(only) > 1:
+                print('WARNING: more than one positive tag results in an empty parameter set. tags: {}'.format(pattern_tags))
+            # retain all parameters that have all of the tags in `only`
+            result = [param for param in result
+                      if not (only - set([param]))]
+
+        exclude = set(tag for tag, value in tags.items() if not value)
+        if exclude:
+            # retain all parameters that have none of the tags in `exclude`
+            result = [param for param in result
+                      if not (set([param]) & exclude)]
+
+        # get the parameters for the functions that fit the pattern tags
+        params = []
+        for param, network in [('phi', self.phi), ('psi', self.psi), ('beta', self.beta)]:
+            if param in result and network is not None:
+                params += lasagne.layers.get_all_params(network, **layer_tags)
+
+        if len(params) == 0:
+            print('WARNING: empty parameter set. tags: {}'.format(pattern_tags))
+
         return params
 
     def get_output_shape_for(self, input_shape):
@@ -243,21 +275,25 @@ class Pattern(object):
         phi_output_shape = self.phi.get_output_shape_for(input_shape)
         return self.psi.get_output_shape_for(phi_output_shape)
 
-    def get_output(self, **kwargs):
-        return self.get_output_for(self.input_var, **kwargs)
-
-    def get_output_for(self, input, **kwargs):
+    def get_output_for(self, input=None, **kwargs):
+        if input is None:
+            input = self.input_var
         return self.get_psi_output_for(input, **kwargs)
         
-    def get_psi_output_for(self, input, **kwargs):
-        phi_output = self.phi.get_output_for(input, **kwargs)
-        return self.psi.get_output_for(phi_output, **kwargs)
+    def get_psi_output_for(self, input=None, **kwargs):
+        if input is None:
+            input = self.input_var
+        return lasagne.layers.get_output(self.psi, inputs=input)
 
-    def get_beta_output_for(self, input, **kwargs):
-        raise NotImplementedError()
+    def get_beta_output_for(self, input=None, **kwargs):
+        if input is None:
+            input = self.input_var
+        return lasagne.layers.get_output(self.beta, inputs=input)
 
-    def get_phi_output_for(self, input, **kwargs):
-        return self.phi.get_output_for(input, **kwargs)
+    def get_phi_output_for(self, input=None, **kwargs):
+        if input is None:
+            input = self.input_var
+        return lasagne.layers.get_output(self.phi, inputs=input)
 
     def training_loss(self, target_weight=0.5, context_weight=0.5):
         if target_weight == 0.:

@@ -22,7 +22,7 @@ class MultiTaskPattern(Pattern):
                 \\ beta(s)
                  \\
                 ---> c
-    """ 
+    """
   
     @property
     def default_target_objective(self):
@@ -54,7 +54,3 @@ class MultiTaskPattern(Pattern):
             self.context_loss = fn(
                 self.get_beta_output_for(self.input_var), self.context_var
             ).mean()
-            
-    def get_beta_output_for(self, input, **kwargs):
-        phi_output = self.phi.get_output_for(input, **kwargs)
-        return self.beta.get_output_for(phi_output, **kwargs)

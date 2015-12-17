@@ -56,6 +56,3 @@ class MultiViewPattern(Pattern):
                 self.get_beta_output_for(self.context_var), 
                 self.get_phi_output_for(self.input_var)
             ).mean()
-            
-    def get_beta_output_for(self, input, **kwargs):
-        return self.beta.get_output_for(input, **kwargs)
