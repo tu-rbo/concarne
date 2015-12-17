@@ -61,6 +61,48 @@ class Pattern(object):
         if isfunction(self.context_loss):
             self.context_loss_fn = self.context_loss
             self.context_loss = None
+
+        # tag the parameters of each function with the name of the function
+        for fun, fun_name in zip([self.phi, self.psi, self.beta], ['phi', 'psi', 'beta']):
+            self._tag_function_parameters(fun, fun_name)
+        
+
+    def _tag_function_parameters(self, fun, fun_name):
+        for l in lasagne.layers.get_all_layers(fun):
+            params = l.get_params()
+            for p in params:
+                if fun_name != 'phi' and 'phi' in l.params[p]:
+                    #print ("omitting phi for %s" % str(p))
+                    continue
+                #print ("adding %s to param %s" % (fun_name, str(p)))
+                l.params[p].add(fun_name)
+        
+    @property
+    def training_input_vars(self):
+        """
+            Return the theano variables that are required for training.
+            
+            Usually this will correspond to 
+            (input_var, target_var, context_var)
+            which is also the default.
+            
+            Order matters!
+        """
+        return (self.input_var, self.target_var, self.context_var)
+          
+    @property
+    def context_vars(self):
+        """
+            Return the theano variables that are required for training.
+            
+            Usually this will correspond to 
+            (input_var, target_var, context_var)
+            which is also the default.
+            
+            Order matters!
+        """
+        return (self.context_var, )
+          
             
     @property
     def default_target_objective(self):
@@ -197,5 +239,10 @@ class Pattern(object):
         return self.phi.get_output_for(input, **kwargs)
 
     def training_loss(self, target_weight=0.5, context_weight=0.5):
-        return target_weight * self.target_loss \
-            + context_weight * self.context_loss
+        if target_weight == 0.:
+            return context_weight * self.context_loss
+        elif context_weight == 0.:
+            return target_weight * self.target_loss
+        else:
+            return target_weight * self.target_loss \
+                + context_weight * self.context_loss

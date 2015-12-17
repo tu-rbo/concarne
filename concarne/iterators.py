@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from .utils import all_elements_equal_len
+
 from collections import OrderedDict
 
 import numpy as np
@@ -67,7 +69,7 @@ class AlignedBatchIterator(object):
         assert (len(args) > 0)
         
         # make sure all items have equal length
-        assert (not np.isnan(reduce(lambda x,y: x if x==y else np.nan, map(len, self.elem_list))))
+        assert (all_elements_equal_len(self.elem_list))
         
         return self
 
@@ -88,6 +90,10 @@ class AlignedBatchIterator(object):
             return len(list(X.values())[0])
         else:
             return len(X)
+
+    @property
+    def num_inputs(self):
+        return len(self.elem_list)
 
     def __getstate__(self):
         state = dict(self.__dict__)
