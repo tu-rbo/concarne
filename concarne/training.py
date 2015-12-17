@@ -194,8 +194,10 @@ class PatternTrainer(object):
         return self
 
     def _train(self, train_fns, batch_iterators, batch_iterator_args_lst, simultaneous_mode, X_val=None, y_val=None):
-        # we switch of the on_unused_input warning because in various
-        # circumstance, e.g. in the decoupled procedure, we might pass
+        
+        
+        # we switch of the on_unused_input warning because in some
+        # circumstances, e.g. in the decoupled procedure, we might pass
         # unused inputs to the training function (e.g. target_var
         # is not used in the pretrain phase). The only reason for having this
         # so we don't have to deal with implementing different 
