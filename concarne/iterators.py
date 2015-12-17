@@ -61,6 +61,8 @@ class AlignedBatchIterator(object):
         
         self.batch_size = batch_size
         self.shuffle = shuffle
+        
+        self.elem_list = None
 
     def __call__(self, *args):
         """

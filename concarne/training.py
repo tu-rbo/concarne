@@ -143,6 +143,15 @@ class PatternTrainer(object):
     
         # Compile a function performing a training step on a mini-batch (by giving
         # the updates dictionary) and returning the corresponding training loss:
+        
+        # we switch of the on_unused_input warning because in some
+        # circumstances, e.g. in the decoupled procedure, we might pass
+        # unused inputs to the training function (e.g. target_var
+        # is not used in the pretrain phase). The only reason for having this
+        # so we don't have to deal with implementing different 
+        # training_input_vars methods in the Pattern class
+        theano.config.on_unused_input = 'ignore'
+
         train_fn = theano.function(train_fn_inputs, loss, updates=updates)
     
         return train_fn
@@ -268,30 +277,31 @@ class PatternTrainer(object):
         if self.procedure in ['decoupled', 'pretrain_finetune']:
             # first training phase
             if self.verbose:
-                print (" Optimize phi & beta using the contextual objective")
+                print ("Optimize phi & beta using the contextual objective")
             train_fn = self._compile_train_fn(self.pattern.training_input_vars,
                                               loss_weights={'target_weight': 0.0, 'context_weight': 1.0}, 
                                               tags= {'psi': False} )
-            self._train(train_fn, self.val_fn, batch_iterators[0], batch_iterator_args_lst[0], X_val, y_val)
+            self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]], X_val, y_val)
 
             # second training phase
             if self.procedure == 'decoupled':
                 if self.verbose:
-                    print (" Optimize psi using the target objective")
+                    print ("=====\nOptimize psi using the target objective")
                 train_fn = self._compile_train_fn(self.pattern.training_input_vars,
                                                   loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
                                                   tags= {'psi': True} ) # beta: False?
-                self._train(train_fn, batch_iterators[1], batch_iterator_args_lst[1], X_val, y_val)
+                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val)
             elif self.procedure == 'pretrain_finetune':
                 if self.verbose:
-                    print (" Optimize phi & psi using the target objective")
-                train_fn = self._compile_train_fn( loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
-                                                        tags= {'beta': False} )
-                self._train(train_fn, batch_iterators[1], batch_iterator_args_lst[1], X_val, y_val)
+                    print ("=====\nOptimize phi & psi using the target objective")
+                train_fn = self._compile_train_fn(self.pattern.training_input_vars,
+                                                  loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
+                                                  tags= {'beta': False} )
+                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val)
         
         elif self.procedure == 'simultaneous':
                 if self.verbose:
-                    print (" Optimize phi & psi & beta using a weighted sum of target and contextual objective")
+                    print ("Optimize phi & psi & beta using a weighted sum of target and contextual objective")
                 if simultaneous_mode == "standard":
                     print ("   -> standard mode with single training function")
                     train_fn = self._compile_train_fn(self.pattern.training_input_vars,
@@ -314,23 +324,12 @@ class PatternTrainer(object):
 
                     train_fn = [train_fn1, train_fn2]
                     
-                self._train(train_fn, batch_iterators, batch_iterator_args_lst, simultaneous_mode, X_val, y_val)
+                self._train(train_fn, batch_iterators, batch_iterator_args_lst, X_val, y_val)
         
         return self
 
-    def _train(self, train_fns, batch_iterators, batch_iterator_args_lst, simultaneous_mode, X_val=None, y_val=None):
-        
-        
-        # we switch of the on_unused_input warning because in some
-        # circumstances, e.g. in the decoupled procedure, we might pass
-        # unused inputs to the training function (e.g. target_var
-        # is not used in the pretrain phase). The only reason for having this
-        # so we don't have to deal with implementing different 
-        # training_input_vars methods in the Pattern class
-        theano.config.on_unused_input = 'ignore'
+    def _train(self, train_fns, batch_iterators, batch_iterator_args_lst, X_val=None, y_val=None):
 
-        assert (simultaneous_mode in ["standard", "alternating"])
-        
         if self.val_fn is None:
             self.val_fn = self._compile_val_fn()
         
