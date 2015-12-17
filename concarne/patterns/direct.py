@@ -14,10 +14,12 @@ import lasagne.objectives
 class DirectPattern(Pattern):
     """
     The :class:`DirectPattern` is the simplest contextual pattern where 
-    c is used directly as the target representation s = phi(x):
-    x ----> s -----> y
-      phi   |  psi
-            c  
+    c is used directly as the target representation s = phi(x)::
+    
+     x ----> s -----> y
+       phi   |  psi
+             c  
+
     """
   
     @property

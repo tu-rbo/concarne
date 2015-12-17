@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 import numpy as np
 
-__all__ = ["AlignedBatchIterator", ]#"DualContextBatchIterator"]
+__all__ = ["AlignedBatchIterator", ]
 
 # ---------------------------------------------------------------------------
 
@@ -44,6 +44,13 @@ class AlignedBatchIterator(object):
         
         Inspired by the BatchIterator class used in nolearn.
         https://github.com/dnouri/nolearn
+        
+        Parameters
+        ----------
+        batch_size : int
+            Size of mini batch
+        shuffle : bool, optional
+            Shuffle data before iterating
     """
     
     def __init__(self, batch_size, shuffle=True):
@@ -58,7 +65,7 @@ class AlignedBatchIterator(object):
     def __call__(self, *args):
         """
         Note for developers:
-        The __call__ magic function puts all passed arguments into a dictionary
+        The __call__ magic function puts all passed arguments into a list
         elem_list which is used for iteration.
         
         It also checks whether all args contain the same number of elements.
@@ -102,21 +109,3 @@ class AlignedBatchIterator(object):
                 del state[attr]
         return state
         
-
-## ---------------------------------------------------------------------------
-#
-#class DualContextBatchIterator(SimpleBatchIterator):
-#    """
-#      Simple iterator class for aligned X,Y,CX and Cy.
-#    """
-#    def __call__(self, X, y, CX, Cy):
-#        self.elem_list = OrderedDict()
-#        self.elem_list['X'] = X
-#        self.elem_list['y'] = y
-#        self.elem_list['CX'] = CX
-#        self.elem_list['Cy'] = Cy
-#            
-#        # make sure all items have equal length
-#        assert (not np.isnan(reduce(lambda x,y: x if x==y else np.nan, map(len, self.elem_list.values()))))
-#        
-#        return self

@@ -4,6 +4,7 @@ Pairwise patterns.
 
 """
 __all__ = [
+  "PairwiseTransformationPattern",
   "PairwisePredictTransformationPattern",
 ]
 
@@ -12,19 +13,17 @@ from .base import Pattern
 import lasagne.objectives
 import lasagne.layers
 
-import numpy as np
-
 class PairwiseTransformationPattern(Pattern):
     """
     Base class for all pairwise transformation patterns. The general framework
-    is as follows:
+    is as follows::
     
                    psi
-    x_i ----> s_i ------> y
-         phi      \
-                   \
-    x_j ----> s_j -->  ~c
-         phi       beta
+      x_i ----> s_i ------> y
+           phi      \\
+                     \\
+      x_j ----> s_j -->  ~c
+           phi       beta
 
     Note that self.context_var should represent x_j, whereas self.input_var 
     represents self.x_i. The variable ``c'' in the picture is then represented
@@ -82,14 +81,14 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
     The :class:`PairwisePredictTransformationPattern` is a contextual pattern where 
     c is used as given information about the transformation between pairs
     of input pairs. The function beta is then used to predict c from a pair
-    (x_i, x_j).
-    
+    (x_i, x_j)::
+
                    psi
-    x_i ----> s_i ------> y
-         phi      \
-                   \
-    x_j ----> s_j ------> ~c
-         phi       beta(s_i, s_j)
+       x_i ----> s_i ------> y
+            phi      \\
+                      \\
+       x_j ----> s_j ------> ~c
+            phi       beta(s_i, s_j)
 
     Note that self.context_var should represent x_j, whereas self.input_var 
     represents self.x_i. The variable ``c'' in the picture is then represented

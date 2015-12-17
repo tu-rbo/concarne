@@ -13,7 +13,89 @@ import time
 import copy
 
 class PatternTrainer(object):
-    
+    """The :class:`PatternTrainer` provides a simple way of training any given pattern 
+       consisting of lasagne layers as functions using mini batch stochastic 
+       gradient descent (SGD)
+       
+       It is similar to :class:`lasagne.layers.Layer` and mimics some of 
+       its functionality, but does not inherit from it.
+       
+       Example with aligned data X_train, y_train and C_train::
+       
+        > pt = concarne.training.PatternTrainer(pattern, 5, 0.0001, 50, 
+                     target_weight=0.9, context_weight=0.1, verbose=True)
+        > pt.fit_XYC(X_train, y_train, C_train, X_val=X_val, y_val=y_val)
+            Training procedure: simultaneous
+             Optimize phi & psi & beta using a weighted sum of target and contextual objective
+               -> standard mode with single training function
+            Starting training...
+            Epoch 1 of 5 took 0.055s
+              training loss:                0.057648
+              validation loss:              0.043710
+              validation accuracy:          97.80 %
+            Epoch 2 of 5 took 0.003s
+              training loss:                0.057491
+              validation loss:              0.043822
+              validation accuracy:          97.80 %
+            Epoch 3 of 5 took 0.003s
+              training loss:                0.057657
+              validation loss:              0.043654
+              validation accuracy:          97.80 %
+            Epoch 4 of 5 took 0.003s
+              training loss:                0.057670
+              validation loss:              0.043589
+              validation accuracy:          97.80 %
+            Epoch 5 of 5 took 0.003s
+              training loss:                0.057997
+              validation loss:              0.043635
+              validation accuracy:          97.80 % 
+       > loss, acc = pt.score(X_test, y_test, verbose=True)
+            Score:
+              loss:                 0.088877
+              accuracy:             97.21 %            
+
+       If in your task, you have more (or simply a different amount of)
+       contextual data available than labels, you can use the method 
+       :method:`fit_XC_XY`::
+       
+        > pt.fit_XYC(X_train, C_train, X_train2, y_train, X_val=X_val, y_val=y_val)
+        
+       In the simultaneous procedure, instead of jointly optimizing the
+       gradient for combined objective, we alternate the computation of the
+       gradient for the  contextual and the target objectives (minibatch-wise).
+
+       Parameters
+       ----------       
+        pattern :  :class:`Pattern`
+            Instance of a pattern
+        num_epochs :  int
+            Number of epochs used to run SGD
+        learning_rate: float
+            Learning for SGD
+        momentum: float
+            Momentum weight (currently using Nesterov momentum)
+        procedure: {'decoupled', 'pretrain_finetune', 'simultaneous'}
+            Three training procedures are supported. decoupled and 
+            pretrain_finetune both use a two stage process, whereas
+            simultaneous optimizes a linear combination of the target and
+            contextual losses. decoupled is only applicable if the
+            contextual loss provides enough guidance to learn a good 
+            representation s, since in the second training phase 
+            :math:`\phi` is not changed anymore. In pretrain_finetune,
+            :math:`\phi` is also optimized in the second training phase.
+        target_weight: float, optional
+            only required for simultaneous training procedure
+        context_weight: float, optional
+            only required for simultaneous training procedure
+        test_objective: lasagne objective function, optional
+            The appropriate test objective for the target task.
+            Per default we use lasagne.objectives.categorical_crossentropy
+            which is only applicable if we use a softmax layer as the last
+            layer of :math:`\psi` and if :member:`target_var` has dtype
+            integer.
+        verbose: bool
+            Whether or not to print what the learner is doing during training.
+        """
     def __init__(self, pattern, 
                  num_epochs, 
                  learning_rate,
@@ -87,7 +169,25 @@ class PatternTrainer(object):
     def fit_XYC(self, X, Y, Cs,
             batch_iterator=None, 
             X_val=None, y_val=None):
+        """Training function for aligned data (same number of examples for
+       X, Y and C)
 
+       Parameters
+       ----------       
+        X :  numpy array
+            Input data (rows: samples, cols: features)
+        Y :  numpy array
+            Labels / target data
+        Cs:  numpy array or list of numpy arrays
+            Context data
+        batch_iterator: iterator, optional
+            Your custom iterator class that accepts X,Y,C1,..Cn as inputs
+        X_val: numpy array, optional
+            Validation input data
+        y_val: numpy array, optional
+            Validation labeled data
+        """
+        # TODO this only holds for AlignedBatchIterator!
         if not isiterable(Cs) or len(Cs[0]) != len(X):
             Cs = [Cs]
 
@@ -102,24 +202,46 @@ class PatternTrainer(object):
                          "standard", X_val, y_val,)
         
     def fit_XC_XY(self, X1, Cs, X2, Y,
-            batch_iterator=None, 
             batch_iterator_XC=None,
+            batch_iterator_XY=None, 
             X_val=None, y_val=None):
+        """Training function for unaligned data (one data set for X and C,
+           another data set for X and Y)
 
+       Parameters
+       ----------       
+        X1 :  numpy array
+            Input data use for optimizing contextual objective 
+            (rows: samples, cols: features)
+        Cs:  numpy array or list of numpy arrays
+            Context data (per default each array should have same len as X1)
+        X1 :  numpy array
+            Input data use for optimizing target objective 
+            (rows: samples, cols: features)
+        Y :  numpy array
+            Labels / target data (per default each array should have same len as X1)
+        batch_iterator_XY: iterator, optional
+            Your custom iterator for going through the X-Y data
+        batch_iterator_XC: iterator, optional
+            Your custom iterator for going through the X-C data
+        X_val: numpy array, optional
+            Validation input data
+        y_val: numpy array, optional
+            Validation labeled data
+        """
         if not isiterable(Cs) or len(Cs[0]) != len(X1):
             Cs = [Cs]
 
-        if batch_iterator is None:
-            batch_iterator = AlignedBatchIterator(self.batch_size, shuffle=True)
+        if batch_iterator_XY is None:
+            batch_iterator_XY = AlignedBatchIterator(self.batch_size, shuffle=True)
+        if batch_iterator_XC is None:
+            batch_iterator_XC = AlignedBatchIterator(self.batch_size, shuffle=True)
 
-        batch_iterators = []
-        if batch_iterator_XC is not None:
-            batch_iterators.append(batch_iterator_XC)
-        else:
-            batch_iterators.append(batch_iterator)
-        # second iterator is always batch_iterator
-        batch_iterators.append(batch_iterator)
-        
+        batch_iterators = [
+            batch_iterator_XC,
+            batch_iterator_XY
+        ]
+
         batch_iterator_args_lst = [ [X1] + Cs, [X2, Y] ]
         if not all_elements_equal_len(batch_iterator_args_lst[0]):
             raise Exception("X1 and all entries in Cs must have same len!")
@@ -247,6 +369,19 @@ class PatternTrainer(object):
                     print("  validation accuracy:\t\t{:.2f} %".format(val_acc * 100))
                     
     def score(self, X, y, batch_size=None, verbose=False):
+        """
+        Parameters
+        ----------       
+        X :  numpy array
+            Input data (rows: samples, cols: features)
+        y :  numpy array
+            Input data (rows: samples, cols: features)
+        batch_size: int, optional
+            batch size for score
+        verbose: string, optional
+            whether to print results of score (default: false)
+        """
+        
         if self.val_fn is None:
             self.val_fn = self._compile_val_fn()
         

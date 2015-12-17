@@ -15,22 +15,27 @@ class Pattern(object):
 
     Parameters
     ----------
-    phi : a lasagne layer for computing the intermediate representation 
-        s = phi(x) from the input x
-    psi : a lasagne layer for computing the prediction of the target
-        from the intermediate representation s, psi(s)=y
-    target_var : Theano variable representing the target
-        Required for formulating the target loss.
-    context_var: Theano variable representing the target
+    phi : lasagne layer
+        a lasagne layer for computing the intermediate representation 
+        :math:`\phi(s)=y` from the input x
+    psi : lasagne layer
+        a lasagne layer for computing the prediction of the target
+        from the intermediate representation s, :math:`\psi(s)=y`
+    target_var : theano tensor variable
+        Theano variable representing the target. Required for formulating the target loss.
+    context_var: theano tensor variable
+        Theano variable representing the target.
         The semantics of this variable depend on the pattern.
         Note that additional context variables might be required by a pattern.
-    target_loss: Theano expression or lasagne objective for the optimizing the 
-        target (optional).
+    target_loss: theano tensor variable, optional
+        Theano expression or lasagne objective for the optimizing the 
+        target.
         All patterns have standard objectives applicable here
-    context_loss: Theano expression or lasagne objective for the contextual 
-        loss (optional).
+    context_loss: theano tensor variable, optional
+        Theano expression or lasagne objective for the contextual 
+        loss.
         All patterns have standard objectives applicable here
-    name : a string or None
+    name : string, optional
         An optional name to attach to this layer.
     """
     def __init__(self, 
@@ -68,6 +73,10 @@ class Pattern(object):
         
 
     def _tag_function_parameters(self, fun, fun_name):
+        """
+        Helper function to add the tag `fun_name` (encoding the function name,
+        e.g. phi or psi) to the function `fun`
+        """
         for l in lasagne.layers.get_all_layers(fun):
             params = l.get_params()
             for p in params:
@@ -79,49 +88,61 @@ class Pattern(object):
         
     @property
     def training_input_vars(self):
-        """
-            Return the theano variables that are required for training.
+        """Return the theano variables that are required for training.
             
-            Usually this will correspond to 
-            (input_var, target_var, context_var)
-            which is also the default.
+           Usually this will correspond to 
+           (input_var, target_var, context_var)
+           which is also the default.
             
-            Order matters!
+           Order matters!
+            
+           Returns
+           -------
+           tuple of theano tensor variables
         """
         return (self.input_var, self.target_var, self.context_var)
           
     @property
     def context_vars(self):
-        """
-            Return the theano variables that are required for training.
+        """Return the theano variables that are required for training.
             
-            Usually this will correspond to 
-            (input_var, target_var, context_var)
-            which is also the default.
+           Usually this will correspond to 
+           (input_var, target_var, context_var)
+           which is also the default.
             
-            Order matters!
+           Order matters!
+
+           Returns
+           -------
+           tuple of theano tensor variables
         """
         return (self.context_var, )
           
             
     @property
     def default_target_objective(self):
-        """
-            Return the default target objective used by this pattern.
+        """ Return the default target objective used by this pattern.
             
             The target objective can be overridden by passing the 
             target_loss argument to the constructor of a pattern
+
+            Returns
+            -------
+            theano expression
         """
         raise NotImplemented()
   
   
     @property  
     def default_context_objective(self):
-        """
-            Return the default contextual objective used by this pattern.
+        """ Return the default contextual objective used by this pattern.
             
             The contextual objective can be overridden by passing the 
             context_loss argument to the constructor of a pattern
+
+            Returns
+            -------
+            theano expression
         """
         raise NotImplemented()
   
@@ -185,7 +206,7 @@ class Pattern(object):
 
         Notes
         -----
-        For layers without any parameters, this will return an empty list.
+        For patterns without any parameters, this will return an empty list.
         """
         params = self.psi.get_params(**tags)
         if self.beta is not None:

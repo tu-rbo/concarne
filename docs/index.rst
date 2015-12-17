@@ -12,7 +12,58 @@ Contents:
    :maxdepth: 2
 
 
+API Reference
+====================================
 
+.. automodule:: concarne
+
+Patterns
+--------
+
+.. toctree::
+  :maxdepth: 3
+
+.. autoclass:: concarne.patterns.Pattern
+    :members:
+
+Single Patterns
+~~~~~~~~~~~~~~~
+
+.. autoclass:: concarne.patterns.DirectPattern
+    :members:
+
+.. autoclass:: concarne.patterns.MultiTaskPattern
+    :members:
+    
+.. autoclass:: concarne.patterns.MultiViewPattern
+    :members:
+
+Pairwise Patterns
+~~~~~~~~~~~~~~~
+    
+.. autoclass:: concarne.patterns.PairwiseTransformationPattern
+    :members:
+    
+.. autoclass:: concarne.patterns.PairwisePredictTransformationPattern
+    :members:
+
+PatternTrainer
+--------
+.. toctree::
+  :maxdepth: 2
+
+.. autoclass:: concarne.training.PatternTrainer
+    :members:
+
+
+Iterators
+--------
+.. toctree::
+  :maxdepth: 2
+
+.. autoclass:: concarne.iterators.AlignedBatchIterator
+    :members:
+    
 Indices and tables
 ==================
 
