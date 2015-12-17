@@ -3,26 +3,22 @@
 #!/usr/bin/env python
 
 """
-This example corresponds to the "synthetic data" experiment in the paper
-http://arxiv.org/abs/1511.06429 illustrating the various patterns.
+This example corresponds use the "synthetic data" experiment in the paper
+http://arxiv.org/abs/1511.06429 to illustrate how to use the pattern trainer.
 
 Note that the file is structured very similarly to the MNIST example for
 Lasagne in order to facilitate usage of concarne for Lasagne users.
 
 In order to run the example first install concarne, or run it from the 
-repostory root with the command
- python -m example/synthetic <parameters>
+repository root with the command
+ python -m example/pattern_trainer_synthetic <parameters>
 
 The script accepts a couple of parameters, e.g.
-  python synthetic.py multiview direct  --num_epochs 500 --batchsize 50
+  python pattern_trainer_synthetic.py multiview direct  --num_epochs 500 --batchsize 50
   
 Run the script with 
-  python synthetic.py --help
+  python pattern_trainer_synthetic.py --help
 for details
-
-The script shows how to "manually" train your network, by using custom
-iterators etc. If you want to see the simpler example, check out
-synthetic_pattern_trainer.py which presents the PatternTrainer class
 
 """
 
@@ -31,6 +27,7 @@ from __future__ import print_function
 import concarne
 import concarne.patterns
 import concarne.iterators
+import concarne.training
 
 import lasagne
 import theano
@@ -217,7 +214,7 @@ def build_pw_transformation_pattern(input_var, target_var, context_var, context_
 
 #  ########################## Main ###############################
 
-def main(pattern_type, data, num_epochs=500, batchsize=50):
+def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
 #if __name__ == "__main__":
 #    pattern_type="multiview"
 #    data='direct'
@@ -244,7 +241,7 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
     num_classes = 2
     
     pattern = None
-    iterate_context_minibatches = None
+    momentum = 0.9
         
     # ------------------------------------------------------
     # Load data and build pattern
@@ -268,7 +265,7 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
           # d == m
           pattern = build_direct_pattern(input_var, target_var, context_var, n, m, num_classes)
           learning_rate=0.0001
-          loss_weights = {}
+          loss_weights = {'target_weight':0.5, 'context_weight':0.5}
 
         elif pattern_type == "multitask":
           pattern = build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_classes)
@@ -280,9 +277,7 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
           learning_rate=0.001
           loss_weights = {'target_weight':0.99, 'context_weight':0.01}
           
-        iterate_context_minibatches = concarne.iterators.AlignedBatchIterator(batchsize, True)
         iterate_context_minibatches_args = [X_train, y_train, C_train]
-        train_fn_inputs = [input_var, target_var, context_var]
     
         
     elif data == "relative":
@@ -298,91 +293,31 @@ def main(pattern_type, data, num_epochs=500, batchsize=50):
         m = Cy_train.shape[1]
 
         pattern = build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m, num_classes)
-        iterate_context_minibatches = concarne.iterators.AlignedBatchIterator(batchsize, True)
-        iterate_context_minibatches_args = [X_train, y_train, CX_train, Cy_train]
-        train_fn_inputs = [input_var, target_var, context_var, context_transform_var]
+
+        iterate_context_minibatches_args = [X_train, y_train, [CX_train, Cy_train]]
+        #train_fn_inputs = [input_var, target_var, context_var, context_transform_var]
         
         learning_rate=0.0001        
         loss_weights = {'target_weight':0.1, 'context_weight':0.9}
     
     # ------------------------------------------------------
     # Get the loss expression for training
-    loss = pattern.training_loss(**loss_weights)
-    loss = loss.mean()
-
-    # Create update expressions for training, i.e., how to modify the
-    # parameters at each training step. Here, we'll use Stochastic Gradient
-    # Descent (SGD) with Nesterov momentum, but Lasagne offers plenty more.
-    params = lasagne.layers.get_all_params(pattern, trainable=True)
-    updates = lasagne.updates.nesterov_momentum(
-            loss, params, learning_rate=learning_rate, momentum=0.9)
-
-    # Create a loss expression for validation/testing. The crucial difference
-    # here is that we do a deterministic forward pass through the network,
-    # disabling dropout layers.
-    test_prediction = lasagne.layers.get_output(pattern, deterministic=True)
-    test_loss = lasagne.objectives.categorical_crossentropy(test_prediction,
-                                                            target_var)
-    test_loss = test_loss.mean()
-    # As a bonus, also create an expression for the classification accuracy:
-    test_acc = T.mean(T.eq(T.argmax(test_prediction, axis=1), target_var),
-                      dtype=theano.config.floatX)
-
-    # Compile a function performing a training step on a mini-batch (by giving
-    # the updates dictionary) and returning the corresponding training loss:
-    train_fn = theano.function(train_fn_inputs, loss, updates=updates)
-
-    # Compile a second function computing the validation loss and accuracy:
-    val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
-
-    # ------------------------------------------------------
-    # Finally, launch the training loop.
+    
+    trainer = concarne.training.PatternTrainer(pattern,
+                                               num_epochs,
+                                               learning_rate,
+                                               batchsize,
+                                               momentum,
+                                               procedure,
+                                               loss_weights['target_weight'],
+                                               loss_weights['context_weight'],
+                                               verbose=True)
     print("Starting training...")
-    # We iterate over epochs:
-    for epoch in range(num_epochs):
-        # In each epoch, we do a full pass over the training data:
-        train_err = 0
-        train_batches = 0
-        start_time = time.time()
-        for batch in iterate_context_minibatches(*iterate_context_minibatches_args):
-            train_err += train_fn(*batch)
-            train_batches += 1
+    trainer.fit_XYC(*iterate_context_minibatches_args, X_val=X_val, y_val=y_val)
 
-        # And a full pass over the validation data:
-        val_err = 0
-        val_acc = 0
-        val_batches = 0
-        sit = concarne.iterators.AlignedBatchIterator(batchsize, shuffle=False)
-        for batch in sit(X_val, y_val):
-            inputs, targets = batch
-            err, acc = val_fn(inputs, targets)
-            val_err += err
-            val_acc += acc
-            val_batches += 1
-
-        # Then we print the results for this epoch:
-        print("Epoch {} of {} took {:.3f}s".format(
-            epoch + 1, num_epochs, time.time() - start_time))
-        print("  training loss:\t\t{:.6f}".format(train_err / train_batches))
-        print("  validation loss:\t\t{:.6f}".format(val_err / val_batches))
-        print("  validation accuracy:\t\t{:.2f} %".format(
-            val_acc / val_batches * 100))
-
-    # After training, we compute and print the test error:
-    test_err = 0
-    test_acc = 0
-    test_batches = 0
-    sit = concarne.iterators.AlignedBatchIterator(500, shuffle=False)
-    for batch in sit(X_test, y_test):
-        inputs, targets = batch
-        err, acc = val_fn(inputs, targets)
-        test_err += err
-        test_acc += acc
-        test_batches += 1
-    print("Final results:")
-    print("  test loss:\t\t\t{:.6f}".format(test_err / test_batches))
-    print("  test accuracy:\t\t{:.2f} %".format(
-        test_acc / test_batches * 100))
+    print("=================")
+    print("Test score...")
+    trainer.score(X_test, y_test, verbose=True)
         
     return pattern
         
@@ -395,8 +330,10 @@ if __name__ == '__main__':
     parser.add_argument("data",  nargs='?', type=str, help="which context data to load", 
                         default='direct', 
                         choices=['direct', 'embedding', 'relative'])
+    parser.add_argument("--procedure", nargs='?', type=str, help="training procedure", 
+                        default='simultaneous', choices=['decoupled', 'simultaneous', 'pretrain_finetune'])
     parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
     parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=50, required=False)
     args = parser.parse_args()
   
-    pattern = main(args.pattern, args.data, args.num_epochs, args.batchsize)
+    pattern = main(args.pattern, args.data, args.procedure, args.num_epochs, args.batchsize)

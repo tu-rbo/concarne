@@ -74,7 +74,13 @@ class PairwiseTransformationPattern(Pattern):
     def get_beta_output_for(self, input_i, input_j, **kwargs):
         raise NotImplementedError()
 
-        
+    @property
+    def training_input_vars(self):
+        return (self.input_var, self.target_var, self.context_var, self.context_transform_var)
+          
+    @property
+    def context_vars(self):
+        return (self.context_var, self.context_transform_var)        
 
 class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
     """

@@ -72,6 +72,9 @@ class PatternTrainer(object):
             Number of epochs used to run SGD
         learning_rate: float
             Learning for SGD
+        learning_rate: int
+            Batch size for SGD (irrelevant if you specify the iterator for
+            the fit_*** methods yourself)
         momentum: float
             Momentum weight (currently using Nesterov momentum)
         procedure: {'decoupled', 'pretrain_finetune', 'simultaneous'}
