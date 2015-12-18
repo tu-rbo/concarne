@@ -98,8 +98,8 @@ def load_dataset(data_file, data_url):
 
 
 def load_handwritten_data():
-    data_file = 'data.npz'
-    data_url = ''
+    data_file = 'handwritten_characters.npz'
+    data_url = 'https://owncloud.tu-berlin.de/public.php?service=files&t=f172d1d0480ad23685670e49e0aba958&download'
     return load_dataset(data_file, data_url)[1]
 
 
@@ -285,7 +285,7 @@ if __name__ == '__main__':
     parser.add_argument("training_procedure", type=str, help="which training procedure to use",
                         default='pretrain_finetune', nargs='?',
                         choices=['decoupled', 'pretrain_finetune', 'simultaneous'])
-    parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=2, required=False)
+    parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=100, required=False)
     parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=20, required=False)
     args = parser.parse_args()
 
