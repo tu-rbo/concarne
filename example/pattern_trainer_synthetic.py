@@ -326,7 +326,7 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
     print("Test score...")
     trainer.score(X_test, y_test, verbose=True)
         
-    return pattern
+    return trainer
         
 # ------------------------------------------------------        
 if __name__ == '__main__':
@@ -343,4 +343,4 @@ if __name__ == '__main__':
     parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=50, required=False)
     args = parser.parse_args()
   
-    pattern = main(args.pattern, args.data, args.procedure, args.num_epochs, args.batchsize)
+    trainer = main(args.pattern, args.data, args.procedure, args.num_epochs, args.batchsize)
