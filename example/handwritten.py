@@ -265,8 +265,6 @@ def main(pattern, data_representation, procedure, num_epochs, batchsize):
                                                loss_weights['target_weight'],
                                                loss_weights['context_weight'])
     print("Starting training...")
-    print(len(X_train))
-    print(len(C_train))
     trainer.fit_XC_XY(X_train, [C_train], X_sup, y_sup, X_val=X_test, y_val=y_test, verbose=True)
 
     print("=================")
