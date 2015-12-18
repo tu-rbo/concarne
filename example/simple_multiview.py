@@ -138,19 +138,23 @@ if __name__ == "__main__":
     # instantiate the PatternTrainer which trains the pattern via stochastic
     # gradient descent
     trainer = concarne.training.PatternTrainer(pattern,
-                                               num_epochs=100,
+                                               num_epochs=200,
                                                learning_rate=0.01,
                                                batch_size=10,
                                                momentum=0.9,
                                                procedure='simultaneous',
-                                               verbose=True,
                                                )
    
     # we use the fit_XYC method because our X, Y and C data all have the same
     # size. Also note the [] our C_train - because it is possible to pass
     # multiple contexts to some patterns, you have to pass context data
     # in a list.
-    trainer.fit_XYC(X_train, y_train, [C_train], X_val=X_val, y_val=y_val)
+    # We can also pass validation data to the fit method, however it only
+    # has an effect if we set the verbose switch to true to give us
+    # information about the learning progress
+    trainer.fit_XYC(X_train, y_train, [C_train], 
+                    X_val=X_val, y_val=y_val, 
+                    verbose=True)
 
     # print some statistics
     print("=================")

@@ -315,11 +315,12 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
                                                batchsize,
                                                momentum,
                                                procedure,
-                                               verbose=True,
                                                **loss_weights
                                                )
     print("Starting training...")
-    trainer.fit_XYC(*iterate_context_minibatches_args, X_val=X_val, y_val=y_val)
+    trainer.fit_XYC(*iterate_context_minibatches_args, 
+                    X_val=X_val, y_val=y_val,
+                    verbose=True)
 
     print("=================")
     print("Test score...")

@@ -96,8 +96,8 @@ class PatternTrainer(object):
             which is only applicable if we use a softmax layer as the last
             layer of :math:`\psi` and if :member:`target_var` has dtype
             integer.
-        verbose: bool
-            Whether or not to print what the learner is doing during training.
+        verbose: bool, deprecated
+            Use the verbose flags in fit_*** and score instead
         """
     def __init__(self, pattern, 
                  num_epochs, 
@@ -108,7 +108,7 @@ class PatternTrainer(object):
                  target_weight=None, 
                  context_weight=None,
                  test_objective=lasagne.objectives.categorical_crossentropy,
-                 verbose=True):
+                 verbose=None):
         self.pattern = pattern
         self.num_epochs = num_epochs
         self.batch_size = batch_size
@@ -130,7 +130,9 @@ class PatternTrainer(object):
         self.val_fn = None
         self.val_batch_iterator = None
         
-        self.verbose = verbose
+        if verbose is not None:
+            print ("WARN: passing verbose to constructor of PatternTrainer is deprecated."+
+                " Use verbose flags for fit*** and score methods instead." )
 
     def _compile_train_fn(self, train_fn_inputs, loss_weights, tags):
         loss = self.pattern.training_loss(**loss_weights).mean()
@@ -180,7 +182,8 @@ class PatternTrainer(object):
         
     def fit_XYC(self, X, Y, Cs,
             batch_iterator=None, 
-            X_val=None, y_val=None):
+            X_val=None, y_val=None,
+            verbose=False):
         """Training function for aligned data (same number of examples for
        X, Y and C)
 
@@ -213,12 +216,13 @@ class PatternTrainer(object):
             raise Exception("X, Y and C must have same len!")
 
         return self._fit([batch_iterator]*2, [batch_iterator_args]*2, 
-                         "standard", X_val, y_val,)
+                         "standard", X_val, y_val, verbose)
         
     def fit_XC_XY(self, X1, Cs, X2, Y,
             batch_iterator_XC=None,
             batch_iterator_XY=None, 
-            X_val=None, y_val=None):
+            X_val=None, y_val=None,
+            verbose=False):
         """Training function for unaligned data (one data set for X and C,
            another data set for X and Y)
 
@@ -266,9 +270,9 @@ class PatternTrainer(object):
             raise Exception("X2 and Y must have same len!")
             
         return self._fit(batch_iterators, batch_iterator_args_lst, 
-                         "alternating", X_val, y_val)
+                         "alternating", X_val, y_val, verbose)
         
-    def _fit(self, batch_iterators, batch_iterator_args_lst, simultaneous_mode="standard", X_val=None, y_val=None):
+    def _fit(self, batch_iterators, batch_iterator_args_lst, simultaneous_mode="standard", X_val=None, y_val=None, verbose=False):
 
         assert (simultaneous_mode in ["standard", "alternating"])
 
@@ -276,37 +280,37 @@ class PatternTrainer(object):
             assert (len(X_val) == len(y_val))
 
         # training procedures
-        if self.verbose:
+        if verbose:
             print ("Training procedure: %s" % self.procedure)
 
         if self.procedure in ['decoupled', 'pretrain_finetune']:
             # first training phase
-            if self.verbose:
+            if verbose:
                 print ("Optimize phi & beta using the contextual objective")
             train_fn = self._compile_train_fn(self.pattern.training_input_vars,
                                               loss_weights={'target_weight': 0.0, 'context_weight': 1.0}, 
-                                              tags= {'psi': False} )
+                                              tags= {'psi': False}, )
             # passing X_val and y_val doesn't make sense because psi is not trained
-            self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]])
+            self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]], verbose=verbose)
 
             # second training phase
             if self.procedure == 'decoupled':
-                if self.verbose:
+                if verbose:
                     print ("=====\nOptimize psi using the target objective")
                 train_fn = self._compile_train_fn(self.pattern.training_input_vars,
                                                   loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
-                                                  tags= {'psi': True} ) # beta: False?
-                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val)
+                                                  tags= {'psi': True}, ) # beta: False is implicit
+                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
             elif self.procedure == 'pretrain_finetune':
-                if self.verbose:
+                if verbose:
                     print ("=====\nOptimize phi & psi using the target objective")
                 train_fn = self._compile_train_fn(self.pattern.training_input_vars,
                                                   loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
-                                                  tags= {'beta': False} )
-                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val)
+                                                  tags= {'beta': False}, )
+                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
         
         elif self.procedure == 'simultaneous':
-                if self.verbose:
+                if verbose:
                     print ("Optimize phi & psi & beta using a weighted sum of target and contextual objective")
                 if simultaneous_mode == "standard":
                     print ("   -> standard mode with single training function")
@@ -330,11 +334,11 @@ class PatternTrainer(object):
 
                     train_fn = [train_fn1, train_fn2]
                     
-                self._train(train_fn, batch_iterators, batch_iterator_args_lst, X_val, y_val)
+                self._train(train_fn, batch_iterators, batch_iterator_args_lst, X_val, y_val, verbose=verbose)
         
         return self
 
-    def _train(self, train_fns, batch_iterators, batch_iterator_args_lst, X_val=None, y_val=None):
+    def _train(self, train_fns, batch_iterators, batch_iterator_args_lst, X_val=None, y_val=None, verbose=False):
 
         if self.val_fn is None:
             self.val_fn = self._compile_val_fn()
@@ -346,7 +350,7 @@ class PatternTrainer(object):
         if not isiterable(batch_iterator_args_lst):
             batch_iterator_args_lst = [batch_iterator_args_lst]
         
-        if self.verbose:
+        if verbose:
             print("Starting training...")
         # We iterate over epochs:
         for epoch in range(self.num_epochs):
@@ -369,7 +373,7 @@ class PatternTrainer(object):
                 val_err, val_acc = self.score(X_val, y_val, batch_size=bs)
     
             # Then we print the results for this epoch:
-            if self.verbose:
+            if verbose:
                 print("Epoch {} of {} took {:.3f}s".format(
                     epoch + 1, self.num_epochs, time.time() - start_time))
                 print("  training loss:\t\t{:.6f}".format(train_err / train_batches))
