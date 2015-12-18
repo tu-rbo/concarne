@@ -283,11 +283,20 @@ class PatternTrainer(object):
         if verbose:
             print ("Training procedure: %s" % self.procedure)
 
+        # default: only one phase, with all vars as inputs for train_fn
+        train_vars_phase1 = self.pattern.training_input_vars
+        train_vars_phase2 = train_vars_phase1
+        if simultaneous_mode == "alternating":
+            # alternating: two train_fn, one accepting X,C, two accepting X,Y
+            train_vars_phase1 = [self.pattern.input_var] + list(self.pattern.context_vars)
+            train_vars_phase2 = [self.pattern.input_var, self.pattern.target_var]
+
         if self.procedure in ['decoupled', 'pretrain_finetune']:
             # first training phase
             if verbose:
                 print ("Optimize phi & beta using the contextual objective")
-            train_fn = self._compile_train_fn(self.pattern.training_input_vars,
+                
+            train_fn = self._compile_train_fn(train_vars_phase1,
                                               loss_weights={'target_weight': 0.0, 'context_weight': 1.0}, 
                                               tags= {'psi': False}, )
             # passing X_val and y_val doesn't make sense because psi is not trained
@@ -297,19 +306,19 @@ class PatternTrainer(object):
             if self.procedure == 'decoupled':
                 if verbose:
                     print ("=====\nOptimize psi using the target objective")
-                train_fn = self._compile_train_fn(self.pattern.training_input_vars,
+                train_fn = self._compile_train_fn(train_vars_phase2,
                                                   loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
                                                   tags= {'psi': True}, ) # beta: False is implicit
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
             elif self.procedure == 'pretrain_finetune':
                 if verbose:
                     print ("=====\nOptimize phi & psi using the target objective")
-                train_fn = self._compile_train_fn(self.pattern.training_input_vars,
+                train_fn = self._compile_train_fn(train_vars_phase2,
                                                   loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
                                                   tags= {'beta': False}, )
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
         
-        elif self.procedure == 'simultaneous':
+            elif self.procedure == 'simultaneous':
                 if verbose:
                     print ("Optimize phi & psi & beta using a weighted sum of target and contextual objective")
                 if simultaneous_mode == "standard":
@@ -322,13 +331,13 @@ class PatternTrainer(object):
                     print ("   -> alternating mode with two training functions")
                     lw1 = copy.copy(self.loss_weights)
                     lw1['target_weight'] = 0.
-                    train_fn1 = self._compile_train_fn([self.pattern.input_var] + list(self.pattern.context_vars),
+                    train_fn1 = self._compile_train_fn(train_vars_phase1,
                         loss_weights=lw1, 
                         tags= {'psi': False} ) 
 
                     lw2 = copy.copy(self.loss_weights)
                     lw2['context_weight'] = 0.
-                    train_fn2 = self._compile_train_fn([self.pattern.input_var, self.pattern.target_var],
+                    train_fn2 = self._compile_train_fn(train_vars_phase2,
                         loss_weights=lw2, 
                         tags= {'beta': False} )
 
