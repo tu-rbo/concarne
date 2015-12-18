@@ -63,15 +63,15 @@ def load_dataset(tr_data, tr_data_url, test_data, test_data_url):
     # sanity check
     assert (np.mean (npz_train['R'] - npz_test['R']) == 0.)
 
-    X = npz_train['X']
+    X = np.cast['float32'](npz_train['X'])
     Y = np.cast['int32'](npz_train['Y'])
-    C = npz_train['C']
+    C = np.cast['float32'](npz_train['C'])
 
-    X_valid = npz_train['X_valid']
+    X_valid = np.cast['float32'](npz_train['X_valid'])
     Y_valid = np.cast['int32'](npz_train['Y_valid'])
     #C_valid = npz_train['C_valid']
 
-    X_test = npz_test['X_test']
+    X_test = np.cast['float32'](npz_test['X_test'])
     Y_test = np.cast['int32'](npz_test['Y_test'])
     #C_test = npz_train['C_test']
     
