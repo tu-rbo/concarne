@@ -81,10 +81,11 @@ class Pattern(object):
             params = l.get_params()
             for p in params:
                 if fun_name != 'phi' and 'phi' in l.params[p]:
-                    #print ("omitting phi for %s" % str(p))
+#                    print ("omitting phi for %s" % str(p))
                     continue
-                #print ("adding %s to param %s" % (fun_name, str(p)))
+#                print ("adding %s to param %s" % (fun_name, str(p)))
                 l.params[p].add(fun_name)
+#                print ("  tags: " + str(l.params[p]))
         
     @property
     def training_input_vars(self):
@@ -210,42 +211,12 @@ class Pattern(object):
         """
 
         # check between tags that belong to the pattern and those that belong to the layers
-        pattern_keys = ['phi', 'psi', 'beta']
-        pattern_tags = dict()
-        layer_tags = dict()
-        for key in tags:
-            if key in pattern_keys:
-                pattern_tags[key] = tags[key]
-            else:
-                layer_tags[key] = tags[key]
-
-        result = ['phi', 'psi', 'beta']
-
-        only = set(tag for tag, value in pattern_tags.items() if value)
-        if only:
-            if len(only) > 1:
-                print('WARNING: more than one positive tag results in an empty parameter set. tags: {}'.format(pattern_tags))
-            # retain all parameters that have all of the tags in `only`
-            result = [param for param in result
-                      if not (only - set([param]))]
-
-        exclude = set(tag for tag, value in tags.items() if not value)
-        if exclude:
-            # retain all parameters that have none of the tags in `exclude`
-            result = [param for param in result
-                      if not (set([param]) & exclude)]
-
-        # get the parameters for the functions that fit the pattern tags
-        params = []
-        for param, network in [('phi', self.phi), ('psi', self.psi), ('beta', self.beta)]:
-            if param in result and network is not None:
-                params += lasagne.layers.get_all_params(network, **layer_tags)
-
-        if len(params) == 0:
-            print('WARNING: empty parameter set. tags: {}'.format(pattern_tags))
-
+        params = lasagne.layers.get_all_params(self.psi, **tags)
+        if self.beta is not None:
+            params += lasagne.layers.get_all_params(self.beta, **tags)
+        params += lasagne.layers.get_all_params(self.phi, **tags) 
         return params
-
+        
     def get_output_shape_for(self, input_shape):
         """
         Computes the output shape of this layer, given an input shape.

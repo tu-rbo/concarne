@@ -147,6 +147,9 @@ class PatternTrainer(object):
         updates = lasagne.updates.nesterov_momentum(
             loss, params, learning_rate=self.learning_rate, momentum=self.momentum)
     
+#        print (params)
+#        print (updates)
+    
         # Compile a function performing a training step on a mini-batch (by giving
         # the updates dictionary) and returning the corresponding training loss:
         
@@ -307,7 +310,7 @@ class PatternTrainer(object):
                                               tags= {'psi': False}, )
             # passing X_val and y_val doesn't make sense because psi is not trained
             self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]], verbose=verbose)
-
+            
             # ---------------------
             # second training phase
             if self.procedure == 'decoupled':
@@ -315,7 +318,7 @@ class PatternTrainer(object):
                     print ("=====\nOptimize psi using the target objective")
                 train_fn = self._compile_train_fn(train_vars_phase2,
                                                   loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
-                                                  tags= {'psi': True}, ) # beta: False is implicit
+                                                  tags= {'phi': False, 'beta': False }, ) # beta: False is implicit
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
             elif self.procedure == 'pretrain_finetune':
                 if verbose:
@@ -330,7 +333,7 @@ class PatternTrainer(object):
                                                   loss_weights={'target_weight': 1.0, 'context_weight': 0.0},
                                                   tags= {'beta': False}, )
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
-        
+
         # ========================================================
         elif self.procedure == 'simultaneous':
             if verbose:
