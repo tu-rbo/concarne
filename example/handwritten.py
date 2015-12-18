@@ -123,36 +123,36 @@ def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
         yield inputs[excerpt], targets[excerpt]
 
 
-def build_conv_net(input_var, input_shape, n_out):
-    network = lasagne.layers.InputLayer(shape=input_shape, input_var=input_var)
-    network = lasagne.layers.Conv2DLayer(network, 32, (5, 5), nonlinearity=lasagne.nonlinearities.rectify)
-    network = lasagne.layers.MaxPool2DLayer(network, 2)
-    network = lasagne.layers.Conv2DLayer(network, 32, (5, 5), nonlinearity=lasagne.nonlinearities.rectify)
-    network = lasagne.layers.MaxPool2DLayer(network, 2)
-    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out,
-                                        nonlinearity=lasagne.nonlinearities.rectify)
+def build_conv_net(input_var, input_shape, n_out, name='conv'):
+    network = lasagne.layers.InputLayer(shape=input_shape, input_var=input_var, name=name+'0_in')
+    network = lasagne.layers.Conv2DLayer(network, 32, (5, 5), nonlinearity=lasagne.nonlinearities.rectify, name=name+'1_conv')
+    network = lasagne.layers.MaxPool2DLayer(network, 2, name=name+'2_pool')
+    network = lasagne.layers.Conv2DLayer(network, 32, (5, 5), nonlinearity=lasagne.nonlinearities.rectify, name=name+'3_conv')
+    network = lasagne.layers.MaxPool2DLayer(network, 2, name =name+'4_pool')
+    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5, name=name+'5_drop'), num_units=n_out,
+                                        nonlinearity=lasagne.nonlinearities.rectify, name=name+'6_dense')
     return network
 
 
-def build_view_net(input_var, input_shape, n_out):
-    network = lasagne.layers.InputLayer(shape=input_shape, input_var=input_var)
-    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out,
-                                        nonlinearity=lasagne.nonlinearities.rectify)
-    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out,
-                                        nonlinearity=lasagne.nonlinearities.rectify)
-    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out,
-                                        nonlinearity=lasagne.nonlinearities.rectify)
+def build_view_net(input_var, input_shape, n_out, name='view'):
+    network = lasagne.layers.InputLayer(shape=input_shape, input_var=input_var, name=name+'0_in')
+    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5, name=name+'1_drop'), num_units=n_out,
+                                        nonlinearity=lasagne.nonlinearities.rectify, name=name+'2_dense')
+    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5, name=name+'3_drop'), num_units=n_out,
+                                        nonlinearity=lasagne.nonlinearities.rectify, name=name+'4_dense')
+    network = lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5, name=name+'5_drop'), num_units=n_out,
+                                        nonlinearity=lasagne.nonlinearities.rectify, name=name+'6_dense')
     return network
 
 
-def build_classifier(network, n_out):
-    return lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out,
-                                     nonlinearity=lasagne.nonlinearities.softmax)
+def build_classifier(network, n_out, name='class'):
+    return lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5, name=name+'0_drop'), num_units=n_out,
+                                     nonlinearity=lasagne.nonlinearities.softmax, name=name+'1_dense')
 
 
-def build_regressor(network, n_out):
-    return lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5), num_units=n_out,
-                                     nonlinearity=lasagne.nonlinearities.linear)
+def build_regressor(network, n_out, name='reg'):
+    return lasagne.layers.DenseLayer(lasagne.layers.DropoutLayer(network, p=0.5, name=name+'0_drop'), num_units=n_out,
+                                     nonlinearity=lasagne.nonlinearities.linear, name=name+'1_dense')
 
 
 # ########################## Build Direct Pattern ###############################
@@ -165,13 +165,13 @@ def build_direct_pattern(input_var, target_var, context_var, input_shape, n_hidd
 # ########################## Build Multi-task Pattern ###############################
 def build_multitask_pattern(input_var, target_var, context_var, input_shape, n_hidden, num_classes, n_out_context,
                             discrete=True):
-    phi = build_conv_net(input_var, input_shape, n_hidden)
-    psi = build_classifier(phi, num_classes)
+    phi = build_conv_net(input_var, input_shape, n_hidden, name='phi')
+    psi = build_classifier(phi, num_classes, name='psi')
     if discrete:
-        beta = build_classifier(phi, n_out_context)
+        beta = build_classifier(phi, n_out_context, name='beta')
         context_loss = lasagne.objectives.categorical_crossentropy(lasagne.layers.get_output(beta), context_var).mean()
     else:
-        beta = build_regressor(phi, n_out_context)
+        beta = build_regressor(phi, n_out_context, name='beta')
         context_loss = lasagne.objectives.squared_error(lasagne.layers.get_output(beta), context_var).mean()
 
     return concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta, target_var=target_var,
@@ -180,9 +180,9 @@ def build_multitask_pattern(input_var, target_var, context_var, input_shape, n_h
 
 #  ########################## Build Multi-view Pattern ###############################
 def build_multiview_pattern(input_var, target_var, context_var, input_shape, n_hidden, num_classes):
-    phi = build_conv_net(input_var, input_shape, n_hidden)
-    psi = build_classifier(phi, num_classes)
-    beta = build_view_net(input_var, input_shape, n_hidden)
+    phi = build_conv_net(input_var, input_shape, n_hidden,name='phi')
+    psi = build_classifier(phi, num_classes,name='phi')
+    beta = build_view_net(input_var, input_shape, n_hidden,name='beta')
 
     return concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta, target_var=target_var,
                                               context_var=context_var)
@@ -287,7 +287,7 @@ if __name__ == '__main__':
     parser.add_argument("training_procedure", type=str, help="which training procedure to use",
                         default='pretrain_finetune', nargs='?',
                         choices=['decoupled', 'pretrain_finetune', 'simultaneous'])
-    parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=100, required=False)
+    parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=2, required=False)
     parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=20, required=False)
     args = parser.parse_args()
 

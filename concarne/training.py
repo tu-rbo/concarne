@@ -138,6 +138,10 @@ class PatternTrainer(object):
         loss = self.pattern.training_loss(**loss_weights).mean()
         
         params = lasagne.layers.get_all_params(self.pattern, trainable=True, **tags)
+
+        print(tags)
+        #print([p.tags for p in params])
+        print(params)
         
         # TODO add possibility to use different update mechanism
         updates = lasagne.updates.nesterov_momentum(
@@ -216,7 +220,7 @@ class PatternTrainer(object):
             raise Exception("X, Y and C must have same len!")
 
         return self._fit([batch_iterator]*2, [batch_iterator_args]*2, 
-                         "standard", X_val, y_val, verbose)
+                         "XYC", X_val, y_val, verbose)
         
     def fit_XC_XY(self, X1, Cs, X2, Y,
             batch_iterator_XC=None,
@@ -270,11 +274,11 @@ class PatternTrainer(object):
             raise Exception("X2 and Y must have same len!")
             
         return self._fit(batch_iterators, batch_iterator_args_lst, 
-                         "alternating", X_val, y_val, verbose)
+                         "XC_XY", X_val, y_val, verbose)
         
-    def _fit(self, batch_iterators, batch_iterator_args_lst, simultaneous_mode="standard", X_val=None, y_val=None, verbose=False):
+    def _fit(self, batch_iterators, batch_iterator_args_lst, data_alignment="XYC", X_val=None, y_val=None, verbose=False):
 
-        assert (simultaneous_mode in ["standard", "alternating"])
+        assert (data_alignment in ["XYC", "XC_XY"])
 
         if X_val is not None and y_val is not None:
             assert (len(X_val) == len(y_val))
@@ -286,10 +290,10 @@ class PatternTrainer(object):
         # default: only one phase, with all vars as inputs for train_fn
         train_vars_phase1 = self.pattern.training_input_vars
         train_vars_phase2 = train_vars_phase1
-        if simultaneous_mode == "alternating":
+        if data_alignment == "XC_XY":
             # alternating: two train_fn, one accepting X,C, two accepting X,Y
-            train_vars_phase1 = [self.pattern.input_var] + list(self.pattern.context_vars)
-            train_vars_phase2 = [self.pattern.input_var, self.pattern.target_var]
+            train_vars_phase1 = [self.pattern.input_var] + list(self.pattern.context_vars) # XC
+            train_vars_phase2 = [self.pattern.input_var, self.pattern.target_var] # XY
 
         # ========================================================
         if self.procedure in ['decoupled', 'pretrain_finetune']:
@@ -315,9 +319,15 @@ class PatternTrainer(object):
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
             elif self.procedure == 'pretrain_finetune':
                 if verbose:
-                    print ("=====\nOptimize phi & psi using the target objective")
+                    print ("=====\nOptimize psi using the target objective")
                 train_fn = self._compile_train_fn(train_vars_phase2,
                                                   loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
+                                                  tags= {'psi': True}, )
+                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
+                if verbose:
+                    print ("=====\nOptimize phi & psi using the target objective")
+                train_fn = self._compile_train_fn(train_vars_phase2,
+                                                  loss_weights={'target_weight': 1.0, 'context_weight': 0.0},
                                                   tags= {'beta': False}, )
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
         
@@ -325,7 +335,7 @@ class PatternTrainer(object):
         elif self.procedure == 'simultaneous':
             if verbose:
                 print ("Optimize phi & psi & beta using a weighted sum of target and contextual objective")
-            if simultaneous_mode == "standard":
+            if data_alignment == "XYC":
                 print ("   -> standard mode with single training function")
                 train_fn = self._compile_train_fn(self.pattern.training_input_vars,
                                                   loss_weights=self.loss_weights,
