@@ -102,7 +102,6 @@ class Pattern(object):
             # if no input layer in list -> build it
             self.beta = \
                 self._initialize_function('beta', beta, self.default_beta_input)
-        
 
         # tag the parameters of each function with the name of the function
         for fun, fun_name in zip([self.phi, self.psi, self.beta], ['phi', 'psi', 'beta']):
@@ -379,12 +378,23 @@ class Pattern(object):
             dictionary containing the params for instantiation of a layer,
             or it contains a lasagne layer object
         
+            Per default, this will create/return an input_layer with self.input_var
+            of dimensionality self.input_shape
             -------
             Returns:            
             tuple of lasagne layer class and dictionary, or lasagne layer instance
                 
         """
-        raise NotImplemented()
+        if self.input_layer is None:
+            # create input layer
+            #print ("Creating input layer for phi")
+            input_dim = self.input_shape
+            if isinstance(self.input_shape, int):
+                input_dim = (None, self.input_shape)
+            self.input_layer = lasagne.layers.InputLayer(shape=input_dim,
+                                        input_var=self.input_var)
+
+        return self.input_layer
 
     @property  
     def default_psi_input(self):
@@ -424,7 +434,6 @@ class Pattern(object):
             
             Should be called by the constructor
         """
-        
         if output is None:
             output = self.get_psi_output_for(self.input_var)
         if target is None:
@@ -442,8 +451,6 @@ class Pattern(object):
             
             # define target loss
             self.target_loss = fn(output, target).mean()
-
-                
 
     @property
     def output_shape(self):

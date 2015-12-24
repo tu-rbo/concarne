@@ -32,6 +32,10 @@ class MultiTaskPattern(Pattern):
     def default_context_objective(self):
         return lasagne.objectives.squared_error
 
+    @property  
+    def default_beta_input(self):
+        return self.phi
+        
     def __init__(self, **kwargs):
         super(MultiTaskPattern, self).__init__(**kwargs)
 
