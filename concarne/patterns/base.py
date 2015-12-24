@@ -107,6 +107,129 @@ class Pattern(object):
         for fun, fun_name in zip([self.phi, self.psi, self.beta], ['phi', 'psi', 'beta']):
             self._tag_function_parameters(fun, fun_name)
         
+        
+        
+    @property
+    def training_input_vars(self):
+        """Return the theano variables that are required for training.
+            
+           Usually this will correspond to 
+           (input_var, target_var, context_var)
+           which is also the default.
+            
+           Order matters!
+            
+           Returns
+           -------
+           tuple of theano tensor variables
+        """
+        return (self.input_var, self.target_var, self.context_var)
+          
+    @property
+    def context_vars(self):
+        """Return the theano variables that are required for training.
+            
+           Usually this will correspond to 
+           (input_var, target_var, context_var)
+           which is also the default.
+            
+           Order matters!
+
+           Returns
+           -------
+           tuple of theano tensor variables
+        """
+        return (self.context_var, )
+          
+            
+    @property
+    def default_target_objective(self):
+        """ Return the default target objective used by this pattern.
+            (implementation required)
+            
+            The target objective can be overridden by passing the 
+            target_loss argument to the constructor of a pattern
+
+            Returns
+            -------
+            theano expression
+        """
+        raise NotImplemented()
+  
+  
+    @property  
+    def default_context_objective(self):
+        """ Return the default contextual objective used by this pattern.
+            (implementation required)
+            
+            The contextual objective can be overridden by passing the 
+            context_loss argument to the constructor of a pattern
+
+            Returns
+            -------
+            theano expression
+        """
+        raise NotImplemented()
+  
+  
+    @property  
+    def default_phi_input(self):
+        """ Specifies the default input to the function :math:`\phi` in this pattern
+            (implementation required)
+            
+            This may either return a tuple of lasagne layer class and a 
+            dictionary containing the params for instantiation of a layer,
+            or it contains a lasagne layer object
+        
+            Per default, this will create/return an input_layer with self.input_var
+            of dimensionality self.input_shape
+            -------
+            Returns:            
+            tuple of lasagne layer class and dictionary, or lasagne layer instance
+                
+        """
+        if self.input_layer is None:
+            # create input layer
+            #print ("Creating input layer for phi")
+            input_dim = self.input_shape
+            if isinstance(self.input_shape, int):
+                input_dim = (None, self.input_shape)
+            self.input_layer = lasagne.layers.InputLayer(shape=input_dim,
+                                        input_var=self.input_var)
+
+        return self.input_layer
+
+    @property  
+    def default_psi_input(self):
+        """ Specifies the default input to the function :math:`\psi` in this pattern
+
+            This may either return a tuple of lasagne layer class and a 
+            dictionary containing the params for instantiation of a layer,
+            or it contains a lasagne layer object
+        
+            Per default, this will return the output of :math:`\phi`.
+        
+            -------
+            Returns:            
+            tuple of lasagne layer class and dictionary, or lasagne layer instance
+        """
+        return self.phi
+
+    @property  
+    def default_beta_input(self):
+        """ Specifies the default input to the function :math:`\beta` in this pattern
+
+            This may either return a tuple of lasagne layer class and a 
+            dictionary containing the params for instantiation of a layer,
+            or it contains a lasagne layer object
+        
+            -------
+            Returns:            
+            tuple of lasagne layer class and dictionary, or lasagne layer instance
+        """
+        raise NotImplemented()
+        
+        
     def _tag_function_parameters(self, fun, fun_name):
         """
         Helper function to add the tag `fun_name` (encoding the function name,
@@ -304,127 +427,6 @@ class Pattern(object):
         # we return the last layer as the representative of the function
         # as it's common in lasagne
         return layer
-
-        
-    @property
-    def training_input_vars(self):
-        """Return the theano variables that are required for training.
-            
-           Usually this will correspond to 
-           (input_var, target_var, context_var)
-           which is also the default.
-            
-           Order matters!
-            
-           Returns
-           -------
-           tuple of theano tensor variables
-        """
-        return (self.input_var, self.target_var, self.context_var)
-          
-    @property
-    def context_vars(self):
-        """Return the theano variables that are required for training.
-            
-           Usually this will correspond to 
-           (input_var, target_var, context_var)
-           which is also the default.
-            
-           Order matters!
-
-           Returns
-           -------
-           tuple of theano tensor variables
-        """
-        return (self.context_var, )
-          
-            
-    @property
-    def default_target_objective(self):
-        """ Return the default target objective used by this pattern.
-            (implementation required)
-            
-            The target objective can be overridden by passing the 
-            target_loss argument to the constructor of a pattern
-
-            Returns
-            -------
-            theano expression
-        """
-        raise NotImplemented()
-  
-  
-    @property  
-    def default_context_objective(self):
-        """ Return the default contextual objective used by this pattern.
-            (implementation required)
-            
-            The contextual objective can be overridden by passing the 
-            context_loss argument to the constructor of a pattern
-
-            Returns
-            -------
-            theano expression
-        """
-        raise NotImplemented()
-  
-  
-    @property  
-    def default_phi_input(self):
-        """ Specifies the default input to the function :math:`\phi` in this pattern
-            (implementation required)
-            
-            This may either return a tuple of lasagne layer class and a 
-            dictionary containing the params for instantiation of a layer,
-            or it contains a lasagne layer object
-        
-            Per default, this will create/return an input_layer with self.input_var
-            of dimensionality self.input_shape
-            -------
-            Returns:            
-            tuple of lasagne layer class and dictionary, or lasagne layer instance
-                
-        """
-        if self.input_layer is None:
-            # create input layer
-            #print ("Creating input layer for phi")
-            input_dim = self.input_shape
-            if isinstance(self.input_shape, int):
-                input_dim = (None, self.input_shape)
-            self.input_layer = lasagne.layers.InputLayer(shape=input_dim,
-                                        input_var=self.input_var)
-
-        return self.input_layer
-
-    @property  
-    def default_psi_input(self):
-        """ Specifies the default input to the function :math:`\psi` in this pattern
-
-            This may either return a tuple of lasagne layer class and a 
-            dictionary containing the params for instantiation of a layer,
-            or it contains a lasagne layer object
-        
-            Per default, this will return the output of :math:`\phi`.
-        
-            -------
-            Returns:            
-            tuple of lasagne layer class and dictionary, or lasagne layer instance
-        """
-        return self.phi
-
-    @property  
-    def default_beta_input(self):
-        """ Specifies the default input to the function :math:`\beta` in this pattern
-
-            This may either return a tuple of lasagne layer class and a 
-            dictionary containing the params for instantiation of a layer,
-            or it contains a lasagne layer object
-        
-            -------
-            Returns:            
-            tuple of lasagne layer class and dictionary, or lasagne layer instance
-        """
-        raise NotImplemented()
 
   
     def _create_target_objective(self, output=None, target=None):
