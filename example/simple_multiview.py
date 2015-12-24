@@ -122,13 +122,13 @@ if __name__ == "__main__":
              # network you should use the markers PHI_OUTPUT_SHAPE,
              # PSI_OUTPUT_SHAPE and BETA_OUTPUT_SHAPE, so that the pattern
              # can automatically infer the correct shape
-             'num_units': concarne.patterns.PairwisePredictTransformationPattern.PHI_OUTPUT_SHAPE,
+             'num_units': concarne.patterns.Pattern.PHI_OUTPUT_SHAPE,
              'nonlinearity':None, 'b':None })]
     psi = [(lasagne.layers.DenseLayer, 
-            { 'num_units': concarne.patterns.PairwisePredictTransformationPattern.PSI_OUTPUT_SHAPE, 
+            { 'num_units': concarne.patterns.Pattern.PSI_OUTPUT_SHAPE, 
             'nonlinearity':lasagne.nonlinearities.softmax, 'b':None })]
     beta = [(lasagne.layers.DenseLayer, 
-            { 'num_units': concarne.patterns.PairwisePredictTransformationPattern.BETA_OUTPUT_SHAPE, 
+            { 'num_units': concarne.patterns.Pattern.BETA_OUTPUT_SHAPE, 
             'nonlinearity':None, 'b':None })]
     
     # now that we have figured our all functions, we can pass them to the pattern
