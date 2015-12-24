@@ -18,11 +18,6 @@ import theano.tensor as T
 import numpy as np
 
 
-def build_linear_simple(input_layer, n_out, nonlinearity=None, name=None):
-    network = lasagne.layers.DenseLayer(input_layer, n_out, nonlinearity=nonlinearity, b=None, name=name)
-    return network    
-
-
 class TestPatternBase(object):
     """
       Setup class generating some simplistic direct data
@@ -65,6 +60,21 @@ class TestPatternBase(object):
         self.target_var = T.matrix('targets') # otherwise dim mismatch for psi
         self.num_classes = 1 # regression -> dim matters, not classes
 
+        self.phi = [
+            (lasagne.layers.DenseLayer,
+             {'num_units': concarne.patterns.Pattern.PHI_OUTPUT_SHAPE, 
+             'nonlinearity': None, 'b':None})]
+            
+        self.psi = [
+            (lasagne.layers.DenseLayer,
+             {'num_units': concarne.patterns.Pattern.PSI_OUTPUT_SHAPE, 
+             'nonlinearity': None, 'b':None})]
+
+        self.beta = [
+            (lasagne.layers.DenseLayer,
+             {'num_units': concarne.patterns.Pattern.BETA_OUTPUT_SHAPE, 
+             'nonlinearity': None, 'b':None})]
+             
     def build_pattern(self):
         """Implemented by derived classes"""
         raise NotImplemented()
@@ -156,14 +166,13 @@ class TestDirectPattern(TestSinglePatternBase):
         super(TestDirectPattern, self).setup()
     
     def build_pattern(self):
-        self.phi = [
-            (lasagne.layers.DenseLayer,
-             {'num_units': self.m, 'nonlinearity': None, 'b':None})]
-            
-        self.psi = [
-            (lasagne.layers.DenseLayer,
-             {'num_units': self.num_classes, 'nonlinearity': None, 'b':None})]
-        print (self.num_classes)
+#        self.phi = [
+#            (lasagne.layers.DenseLayer,
+#             {'num_units': self.m, 'nonlinearity': None, 'b':None})]
+#            
+#        self.psi = [
+#            (lasagne.layers.DenseLayer,
+#             {'num_units': self.num_classes, 'nonlinearity': None, 'b':None})]
 
         self.pattern = concarne.patterns.DirectPattern(phi=self.phi, psi=self.psi, 
                                              input_var=self.input_var,
@@ -171,6 +180,8 @@ class TestDirectPattern(TestSinglePatternBase):
                                              context_var=self.context_var,
                                              input_shape=self.n,
                                              context_shape=self.m,
+                                             target_shape=self.num_classes,
+                                             representation_shape=self.m,
                                              target_loss=lasagne.objectives.squared_error,
                                              )
 
@@ -216,18 +227,6 @@ class TestMultiViewPattern(TestSinglePatternBase):
         super(TestMultiViewPattern, self).setup()
         
     def build_pattern(self):
-        self.phi = [
-            (lasagne.layers.DenseLayer,
-             {'num_units': self.d, 'nonlinearity': None, 'b':None})]
-            
-        self.psi = [
-            (lasagne.layers.DenseLayer,
-             {'num_units': self.num_classes, 'nonlinearity': None, 'b':None})]
-
-        self.beta = [
-            (lasagne.layers.DenseLayer,
-             {'num_units': self.d, 'nonlinearity': None, 'b':None})]
-
         self.pattern = concarne.patterns.MultiViewPattern(phi=self.phi, psi=self.psi, 
                                              beta=self.beta,
                                              input_var=self.input_var,
@@ -235,6 +234,8 @@ class TestMultiViewPattern(TestSinglePatternBase):
                                              context_var=self.context_var,
                                              input_shape=self.n,
                                              context_shape=self.m,
+                                             target_shape=self.num_classes,
+                                             representation_shape=self.d,
                                              target_loss=lasagne.objectives.squared_error,
                                              )        
         
@@ -287,17 +288,17 @@ class TestMultiTaskPattern(TestSinglePatternBase):
         super(TestMultiTaskPattern, self).setup()
         
     def build_pattern(self):
-        self.phi = [
-            (lasagne.layers.DenseLayer,
-             {'num_units': self.d, 'nonlinearity': None, 'b':None})]
-            
-        self.psi = [
-            (lasagne.layers.DenseLayer,
-             {'num_units': self.num_classes, 'nonlinearity': None, 'b':None})]
-
-        self.beta = [
-            (lasagne.layers.DenseLayer,
-             {'num_units': self.m, 'nonlinearity': None, 'b':None})]
+#        self.phi = [
+#            (lasagne.layers.DenseLayer,
+#             {'num_units': self.d, 'nonlinearity': None, 'b':None})]
+#            
+#        self.psi = [
+#            (lasagne.layers.DenseLayer,
+#             {'num_units': self.num_classes, 'nonlinearity': None, 'b':None})]
+#
+#        self.beta = [
+#            (lasagne.layers.DenseLayer,
+#             {'num_units': self.m, 'nonlinearity': None, 'b':None})]
 
         self.pattern = concarne.patterns.MultiTaskPattern(phi=self.phi, psi=self.psi, 
                                              beta=self.beta,
@@ -306,6 +307,8 @@ class TestMultiTaskPattern(TestSinglePatternBase):
                                              context_var=self.context_var,
                                              input_shape=self.n,
                                              context_shape=self.m,
+                                             target_shape=self.num_classes,
+                                             representation_shape=self.d,
                                              target_loss=lasagne.objectives.squared_error,
                                              )
 
@@ -360,6 +363,8 @@ class TestPWTransformationPattern(TestPatternBase):
         # size of desired intermediate representation
         self.d = 1
 
+        self.my = self.Cy.shape[1]
+
         super(TestPWTransformationPattern, self).setup()
         
         assert(self.CX.shape[1] == self.X.shape[1])
@@ -367,13 +372,13 @@ class TestPWTransformationPattern(TestPatternBase):
     def build_pattern(self):
         self.context_transform_var = T.matrix('context_transforms')
 
-        self.phi = [
-            (lasagne.layers.DenseLayer,
-             {'num_units': self.d, 'nonlinearity': None, 'b':None})]
-            
-        self.psi = [
-            (lasagne.layers.DenseLayer,
-             {'num_units': self.num_classes, 'nonlinearity': None, 'b':None})]
+#        self.phi = [
+#            (lasagne.layers.DenseLayer,
+#             {'num_units': self.d, 'nonlinearity': None, 'b':None})]
+#            
+#        self.psi = [
+#            (lasagne.layers.DenseLayer,
+#             {'num_units': self.num_classes, 'nonlinearity': None, 'b':None})]
 
         self.pattern = concarne.patterns.PairwisePredictTransformationPattern(
                                              phi=self.phi, psi=self.psi, 
@@ -383,6 +388,9 @@ class TestPWTransformationPattern(TestPatternBase):
                                              context_transform_var=self.context_transform_var,
                                              input_shape=self.n,
                                              context_shape=self.m,
+                                             target_shape=self.num_classes,
+                                             representation_shape=self.d,
+                                             context_transform_shape=self.my,
                                              target_loss=lasagne.objectives.squared_error,
                                              )        
 
@@ -460,10 +468,10 @@ class TestPWTransformationPattern(TestPatternBase):
                 
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    #td = TestDirectPattern()
+    td = TestDirectPattern()
     #td = TestMultiViewPattern()
     #td = TestMultiTaskPattern()
-    td = TestPWTransformationPattern()
+    #td = TestPWTransformationPattern()
     td.setup()
     td.test_pattern_output()
     td.test_pattern_training_loss_and_grads()

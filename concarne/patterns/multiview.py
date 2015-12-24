@@ -46,6 +46,10 @@ class MultiViewPattern(Pattern):
 
         return self.context_input_layer
         
+    @property  
+    def default_beta_output_shape(self):
+        return self.representation_shape
+                
     def __init__(self, **kwargs):
         self.context_input_layer = None
         super(MultiViewPattern, self).__init__(**kwargs)

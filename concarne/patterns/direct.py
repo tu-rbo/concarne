@@ -38,11 +38,6 @@ class DirectPattern(Pattern):
         self._create_target_objective()
         self._create_context_objective()                                     
 
-    @property  
-    def default_beta_input(self):
-        return None        
-
-            
     def _create_context_objective(self):
         if self.context_loss is None:
             assert (self.input_var is not None)

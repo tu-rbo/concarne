@@ -109,25 +109,39 @@ if __name__ == "__main__":
     # Also, users of the nolearn library might be familiar with this type
     # of specifying a neural network.
         
-    phi = [ 
-        # optionally you can pass an input layer, but it is not required and
-        # will automatically be inferred by the pattern
+    # optionally you can pass an input layer, but it is not required and
+    # will automatically be inferred by the pattern
+    #phi = [ 
         #(lasagne.layers.InputLayer, {'shape': (None, input_dim), 'input_var': input_var}),
-        (lasagne.layers.DenseLayer, { 'num_units': representation_dim, 'nonlinearity':None, 'b':None })]
+        #(lasagne.layers.DenseLayer, { 'num_units': concarne.patterns.PairwisePredictTransformationPattern.PHI_OUTPUT_SHAPE,
+        #                             'nonlinearity':None, 'b':None })]
+        
+    phi = [ (lasagne.layers.DenseLayer, 
+             { 
+             # for the variable of your layer that denotes the output of the
+             # network you should use the markers PHI_OUTPUT_SHAPE,
+             # PSI_OUTPUT_SHAPE and BETA_OUTPUT_SHAPE, so that the pattern
+             # can automatically infer the correct shape
+             'num_units': concarne.patterns.PairwisePredictTransformationPattern.PHI_OUTPUT_SHAPE,
+             'nonlinearity':None, 'b':None })]
     psi = [(lasagne.layers.DenseLayer, 
-            { 'num_units': num_classes, 'nonlinearity':lasagne.nonlinearities.softmax, 'b':None })]
+            { 'num_units': concarne.patterns.PairwisePredictTransformationPattern.PSI_OUTPUT_SHAPE, 
+            'nonlinearity':lasagne.nonlinearities.softmax, 'b':None })]
     beta = [(lasagne.layers.DenseLayer, 
-            { 'num_units': representation_dim, 'nonlinearity':None, 'b':None })]
+            { 'num_units': concarne.patterns.PairwisePredictTransformationPattern.BETA_OUTPUT_SHAPE, 
+            'nonlinearity':None, 'b':None })]
     
     # now that we have figured our all functions, we can pass them to the pattern
     pattern = concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta,
+                                                 # the following parameters are required to automatically
+                                                 # build the functions and the losses
+                                                 input_var=input_var, 
+                                                 target_var=target_var, 
+                                                 context_var=context_var,
                                                  input_shape=input_dim,
                                                  target_shape=num_classes,
                                                  context_shape=context_dim,
                                                  representation_shape=representation_dim,
-                                                 input_var=input_var, # only required in nolearn style init
-                                                 target_var=target_var, 
-                                                 context_var=context_var,
                                                  # we have to define two loss functions: 
                                                  # the target loss deals with optimizing psi and phi wrt. X & Y
                                                  target_loss=lasagne.objectives.categorical_crossentropy,

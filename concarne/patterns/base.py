@@ -44,11 +44,16 @@ class Pattern(object):
     name : string, optional
         An optional name to attach to this layer.
     """
+
+    PHI_OUTPUT_SHAPE='PHI_OUTPUT_SHAPE'    
+    PSI_OUTPUT_SHAPE='PSI_OUTPUT_SHAPE'    
+    BETA_OUTPUT_SHAPE='BETA_OUTPUT_SHAPE'    
+    
     def __init__(self, 
                  phi, psi, beta=None, 
+                 input_var=None, target_var=None, context_var=None, 
                  input_shape=None, target_shape=None, context_shape=None, 
                  representation_shape=None,
-                 input_var=None, target_var=None, context_var=None, 
                  target_loss=None, context_loss=None,
                  name=None):
         self.phi = phi
@@ -58,11 +63,11 @@ class Pattern(object):
         self.input_var = input_var
         self.target_var = target_var
         self.context_var = context_var
-        self.representation_shape = representation_shape
 
         self.input_shape = input_shape
         self.target_shape = target_shape
         self.context_shape = context_shape
+        self.representation_shape = representation_shape
 
         self.target_loss = target_loss
         self.target_loss_fn = None
@@ -86,7 +91,9 @@ class Pattern(object):
             # if no input layer in list -> build it
             assert (input_var is not None)
             self.phi = \
-                self._initialize_function('phi', phi, self.default_phi_input)
+                self._initialize_function('phi', phi, self.default_phi_input,
+                                          self.PHI_OUTPUT_SHAPE,
+                                          self.representation_shape)
             self.input_layer = lasagne.layers.get_all_layers(self.phi)[0]
         else:
             # extract input layer and variable from the given phi
@@ -96,12 +103,17 @@ class Pattern(object):
         if isinstance(psi, list) or isinstance(psi, tuple):
             # if no input layer in list -> build it
             self.psi = \
-                self._initialize_function('psi', psi, self.default_psi_input)
+                self._initialize_function('psi', psi, self.default_psi_input,
+                                          self.PSI_OUTPUT_SHAPE,
+                                          self.target_shape)
         
-        if isinstance(beta, list) or isinstance(beta, tuple):
+        if beta is not None and isinstance(beta, list) or isinstance(beta, tuple):
             # if no input layer in list -> build it
             self.beta = \
-                self._initialize_function('beta', beta, self.default_beta_input)
+                self._initialize_function('beta', beta, self.default_beta_input,
+                                          self.BETA_OUTPUT_SHAPE, 
+                                          self.default_beta_output_shape
+                                          )
 
         # tag the parameters of each function with the name of the function
         for fun, fun_name in zip([self.phi, self.psi, self.beta], ['phi', 'psi', 'beta']):
@@ -229,7 +241,22 @@ class Pattern(object):
         """
         raise NotImplemented()
         
+
+    @property  
+    def default_beta_output_shape(self):
+        """Every pattern that uses an auxiliary function beta should
+        implement this method which computes the shape.
         
+        This is helpful for automatically building beta in nolearn style
+        function parameterization
+        
+        --------
+        Returns:       
+        int or tuple of ints
+        """
+        raise NotImplemented()
+                                       
+    
     def _tag_function_parameters(self, fun, fun_name):
         """
         Helper function to add the tag `fun_name` (encoding the function name,
@@ -271,8 +298,14 @@ class Pattern(object):
         return "{}{}".format(
             layer_class.__name__.lower().replace("layer", ""), index)
             
-    def _initialize_function(self, fun_name, layers, input_layer_tuple):
-        """This method has been adapted from the NeuralFit class in nolearn.
+    def _initialize_function(self, fun_name, layers, input_layer_tuple, 
+                             output_shape_marker, output_shape):
+        """Function to build phi, psi and beta automatically from a 
+        nolearn style network-as-list description.
+        
+        output_shape is currently unused (so you need to provide the right)
+        
+        This method has been adapted from the NeuralFit class in nolearn.
         https://github.com/dnouri/nolearn/blob/master/nolearn/lasagne/base.py
         Copyright (c) 2012-2015 Daniel Nouri"""
             
@@ -404,6 +437,16 @@ class Pattern(object):
                 if isinstance(layer_kw.get(attr), str):
                     name = layer_kw[attr]
                     layer_kw[attr] = getattr(fun_[name], attr, None)
+
+            for k,v in layer_kw.items():
+                if v == output_shape_marker:
+                    #print ("%s triggered -> %s" % (output_shape_marker, str(output_shape)))
+                    if output_shape is None:
+                        raise Exception("Cannot automatically set output shape (is None)"
+                        " for %s - did you set all required shape variables" 
+                        " in the constructor of the pattern?"
+                        " (marker was: %s)" % (fun_name, output_shape_marker))
+                    layer_kw[k] = output_shape
 
             if layer_is_instance:
                 layer = layer_factory

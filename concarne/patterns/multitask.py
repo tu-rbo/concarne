@@ -35,6 +35,10 @@ class MultiTaskPattern(Pattern):
     @property  
     def default_beta_input(self):
         return self.phi
+
+    @property  
+    def default_beta_output_shape(self):
+        return self.context_shape
         
     def __init__(self, **kwargs):
         super(MultiTaskPattern, self).__init__(**kwargs)
@@ -58,3 +62,4 @@ class MultiTaskPattern(Pattern):
             self.context_loss = fn(
                 self.get_beta_output_for(self.input_var), self.context_var
             ).mean()
+
