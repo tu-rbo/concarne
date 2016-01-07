@@ -99,7 +99,7 @@ def load_dataset(data_file, data_url):
 
 def load_handwritten_data():
     data_file = 'handwritten_characters.npz'
-    data_url = 'https://owncloud.tu-berlin.de/public.php?service=files&t=f172d1d0480ad23685670e49e0aba958&download'
+    data_url = "https://owncloud.tu-berlin.de/index.php/s/f172d1d0480ad23685670e49e0aba958/download"
     return load_dataset(data_file, data_url)[1]
 
 

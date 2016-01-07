@@ -80,16 +80,16 @@ def load_dataset(tr_data, tr_data_url, test_data, test_data_url):
     
 def load_direct_context_dataset():
     tr_data = "cl_synth_direct_d-50_e-0_n-500_seed-12340.npz"
-    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Fdirect&files=cl_synth_direct_d-50_e-0_n-500_seed-12340.npz&download"
+    tr_data_url = "https://owncloud.tu-berlin.de/index.php/s/QBoweGppuFbW7CB/download"
     test_data = "cl_synth_direct_d-50_e-0_ntest-50000_seed-12340.npz"
-    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Fdirect&files=cl_synth_direct_d-50_e-0_ntest-50000_seed-12340.npz&download"
+    test_data_url = "https://owncloud.tu-berlin.de/index.php/s/QD03NhenHFhZFdT/download"
     return load_dataset(tr_data, tr_data_url, test_data, test_data_url)[1]
 
 def load_embedding_context_dataset():
     tr_data = "cl_synth_embedding_d-50_e-25_n-500_seed-12340.npz"
-    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Fembedding&files=cl_synth_embedding_d-50_e-25_n-500_seed-12340.npz&download"
+    tr_data_url = "https://owncloud.tu-berlin.de/index.php/s/3YYrcGP0pKHPDvI/download"
     test_data = "cl_synth_embedding_d-50_e-25_ntest-50000_seed-12340.npz"
-    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Fembedding&files=cl_synth_embedding_d-50_e-25_ntest-50000_seed-12340.npz&download"
+    test_data_url = "https://owncloud.tu-berlin.de/index.php/s/zJOrVXiQ6KY0owD/download"
 
     (npz_train, npz_test), res = \
       load_dataset(tr_data, tr_data_url, test_data, test_data_url)
@@ -101,9 +101,9 @@ def load_embedding_context_dataset():
 
 def load_relative_context_dataset():
     tr_data = "cl_synth_relative_d-50_e-0_n-500_seed-12340.npz"
-    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Frelative&files=cl_synth_relative_d-50_e-0_n-500_seed-12340.npz&download"
+    tr_data_url = "https://owncloud.tu-berlin.de/index.php/s/D5Wi67IDtbeMXG2/download"
     test_data = "cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz"
-    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Frelative&files=cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz&download"
+    test_data_url = "https://owncloud.tu-berlin.de/index.php/s/KD0toz7t4ZBa5q5/download"
 
     (_,_), (X, Y, C, X_valid, Y_valid, X_test, Y_test) \
        = load_dataset(tr_data, tr_data_url, test_data, test_data_url)
