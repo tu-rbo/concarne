@@ -45,11 +45,14 @@ class PairwiseTransformationPattern(Pattern):
     def default_context_objective(self):
         return lasagne.objectives.squared_error
   
-    def __init__(self, context_transform_var=None, **kwargs):
-        super(PairwiseTransformationPattern, self).__init__(**kwargs)
-        
+    def __init__(self, context_transform_var=None, context_transform_shape=None, **kwargs):
+        self.context_input_layer = None
+        self.context_transform_shape = context_transform_shape
+
         self.context_transform_var = context_transform_var
         assert (self.context_transform_var is not None)
+
+        super(PairwiseTransformationPattern, self).__init__(**kwargs)
 
         self._create_target_objective()
         self._create_context_objective()                                     
@@ -108,6 +111,22 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
   
     def __init__(self, **kwargs):
         super(PairwisePredictTransformationPattern, self).__init__(**kwargs)
+
+    @property  
+    def default_beta_input(self):
+        if self.context_input_layer is None:
+            # create input layer
+            #print ("Creating input layer for beta")
+            context_dim = self.context_shape
+            if isinstance(self.context_shape, int):
+                context_dim = (None, self.context_shape)
+            self.context_input_layer = lasagne.layers.InputLayer(shape=context_dim,
+                                        input_var=self.context_var)
+        return self.context_input_layer
+
+    @property  
+    def default_beta_output_shape(self):
+        return self.context_transform_shape
 
     def get_beta_output_for(self, input_i, input_j, **kwargs):
         phi_i_output = self.phi.get_output_for(input_i, **kwargs)

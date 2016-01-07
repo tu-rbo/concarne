@@ -33,7 +33,25 @@ class MultiViewPattern(Pattern):
     def default_context_objective(self):
         return lasagne.objectives.squared_error
         
+    @property  
+    def default_beta_input(self):
+        if self.context_input_layer is None:
+            # create input layer
+            #print ("Creating input layer for beta")
+            context_dim = self.context_shape
+            if isinstance(self.context_shape, int):
+                context_dim = (None, self.context_shape)
+            self.context_input_layer = lasagne.layers.InputLayer(shape=context_dim,
+                                        input_var=self.context_var)
+
+        return self.context_input_layer
+        
+    @property  
+    def default_beta_output_shape(self):
+        return self.representation_shape
+                
     def __init__(self, **kwargs):
+        self.context_input_layer = None
         super(MultiViewPattern, self).__init__(**kwargs)
 
         assert(self.beta is not None)

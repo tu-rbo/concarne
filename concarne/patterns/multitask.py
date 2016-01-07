@@ -32,6 +32,14 @@ class MultiTaskPattern(Pattern):
     def default_context_objective(self):
         return lasagne.objectives.squared_error
 
+    @property  
+    def default_beta_input(self):
+        return self.phi
+
+    @property  
+    def default_beta_output_shape(self):
+        return self.context_shape
+        
     def __init__(self, **kwargs):
         super(MultiTaskPattern, self).__init__(**kwargs)
 
@@ -54,3 +62,4 @@ class MultiTaskPattern(Pattern):
             self.context_loss = fn(
                 self.get_beta_output_for(self.input_var), self.context_var
             ).mean()
+
