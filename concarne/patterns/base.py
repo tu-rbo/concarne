@@ -364,7 +364,7 @@ class Pattern(object):
             if user_input_layer is not None:
                 # the user has provided an input layer. ignore it because
                 # we use the functional input layer from the patern
-                raise Exception("You have provided an input layer for %s," % 
+                raise Exception("You have provided an input layer for %s," 
                     " but the pattern requires the input %s" % (fun_name, str(input_layer)))
             else:
                 # push the input layer into the dictionary
