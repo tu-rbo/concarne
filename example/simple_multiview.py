@@ -90,27 +90,58 @@ if __name__ == "__main__":
     input_var = T.matrix('inputs')  # for X
     target_var = T.ivector('targets')  # for Y
     context_var = T.matrix('contexts')  # for C
-
-    # Now define input layers; in our example X and C will be the inputs
-    input_layer = lasagne.layers.InputLayer(shape=(None, input_dim),
-                                        input_var=input_var)
-    context_input_layer = lasagne.layers.InputLayer(shape=(None, context_dim),
-                                        input_var=context_var)
-
-        
-    # Now define the functions - we choose linear functions
-        
+    
     # Size of the intermediate representation phi(X); since S is 1-dim,
     # phi(X) can also map to a 1-dim vector
-    idim = 1 
-    phi = lasagne.layers.DenseLayer(input_layer, idim, nonlinearity=None, b=None, name="phi")
-    psi = lasagne.layers.DenseLayer(phi, num_classes, nonlinearity=lasagne.nonlinearities.softmax, b=None, name="psi")
-    beta = lasagne.layers.DenseLayer(context_input_layer, idim, nonlinearity=None, b=None, name="beta")
+    representation_dim = 1 
+
+    # Now define the functions - we choose linear functions
+    # there are two ways to do it. the first way is to define the 
+    # lasagne network (in our case only on layer) yourself.
+#    phi = lasagne.layers.DenseLayer(input_layer, representation_dim, nonlinearity=None, b=None, name="phi")
+
+    # the easier way of doing it is to pass a list of tuples with a layer
+    # class and the instantion parameters in a dictionary (layer, layer_params).
+    # This has the benefit that you don't have to worry about the definition
+    # of input layers and the correct  wiring of phi, psi and beta - this is 
+    # all taken care of by the pattern.
+
+    # Also, users of the nolearn library might be familiar with this type
+    # of specifying a neural network.
+        
+    # optionally you can pass an input layer, but it is not required and
+    # will automatically be inferred by the pattern
+    #phi = [ 
+        #(lasagne.layers.InputLayer, {'shape': (None, input_dim), 'input_var': input_var}),
+        #(lasagne.layers.DenseLayer, { 'num_units': concarne.patterns.PairwisePredictTransformationPattern.PHI_OUTPUT_SHAPE,
+        #                             'nonlinearity':None, 'b':None })]
+        
+    phi = [ (lasagne.layers.DenseLayer, 
+             { 
+             # for the variable of your layer that denotes the output of the
+             # network you should use the markers PHI_OUTPUT_SHAPE,
+             # PSI_OUTPUT_SHAPE and BETA_OUTPUT_SHAPE, so that the pattern
+             # can automatically infer the correct shape
+             'num_units': concarne.patterns.Pattern.PHI_OUTPUT_SHAPE,
+             'nonlinearity':None, 'b':None })]
+    psi = [(lasagne.layers.DenseLayer, 
+            { 'num_units': concarne.patterns.Pattern.PSI_OUTPUT_SHAPE, 
+            'nonlinearity':lasagne.nonlinearities.softmax, 'b':None })]
+    beta = [(lasagne.layers.DenseLayer, 
+            { 'num_units': concarne.patterns.Pattern.BETA_OUTPUT_SHAPE, 
+            'nonlinearity':None, 'b':None })]
     
     # now that we have figured our all functions, we can pass them to the pattern
     pattern = concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta,
+                                                 # the following parameters are required to automatically
+                                                 # build the functions and the losses
+                                                 input_var=input_var, 
                                                  target_var=target_var, 
                                                  context_var=context_var,
+                                                 input_shape=input_dim,
+                                                 target_shape=num_classes,
+                                                 context_shape=context_dim,
+                                                 representation_shape=representation_dim,
                                                  # we have to define two loss functions: 
                                                  # the target loss deals with optimizing psi and phi wrt. X & Y
                                                  target_loss=lasagne.objectives.categorical_crossentropy,

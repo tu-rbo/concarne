@@ -1,12 +1,105 @@
-# concarne - a lightweight contextual learning framework, based on Theano and Lasagne 
+# concarne 
 
-We implement several contextual learning patterns presented in our paper:
-http://arxiv.org/abs/1511.06429
+#### a lightweight contextual learning framework, based on Theano and Lasagne 
+
+concarne implements various contextual learning patterns presented in this [paper](http://arxiv.org/abs/1511.06429).
+
+### Quickstart
+
+- Check out concarne from the repository<br/>
+```git clone git@gitlab.tubit.tu-berlin.de:rbo-lab/concarne.git```
+- Install concarne:<br/>
+```python setup.py install```
+- Run the simple example <br/>
+```python example/simple_multiview.py```
+
+For more information on how to use concarne, checkout out the documentation
+or the code of the simple example example/simple_multiview.py
 
 The experiments in the paper are implemented in example/synthetic.py and
 example/handwritten.py
-Check the example files on more info how to use them, and also on how to
-apply concarne.
 
-Disclaimer:
+
+### What is concarne?
+
+concarne implements a variety of different patterns that enable to apply
+*contextual learning*. As it depends on Theano and lasagne, you can use 
+neural network structures that you have developed yourself and easily
+combine them with the contextual task.
+
+### What is contextual learning?
+
+Supervised, semi-supervised, and unsupervised learning estimate a function 
+given input/output samples. Generalization to unseen samples requires making 
+prior assumptions about this function. However, many priors assumptions cannot be defined 
+by only taking the function, its input, and its output into account. 
+
+*Contextual learning* uses *contextual data* to define such priors. Contextual
+data are neither from the input space nor from the output space of the function,
+but include useful information for learning it. Importantly, these contextual
+data *are not required during test time*, but only during training time.
+
+Contextual learning subsumes a variety of related approaches, such as 
+- multi-task learning 
+- multi-view learning (or co-learning)
+- Learning using Privileged Information
+- Slow Feature Analysis
+- and others
+
+### Examples for contextual learning?
+
+To apply contextual learning, you need to have an additional source of data (neither input nor output of your
+classifier/regressor) available during training - the *contextual data*.
+However, this additional data is *not required during test time*.
+
+1. Imagine you want to classify images, and during test time you only have RGB
+data available, but during training you also have 3D depth information 
+available. Contextual learning, in particular the multi-view pattern allows you
+to incorporate the depth data during training time to shape your classifier,
+without making the depth data an input of your classifier.<br/>
+Paper: [Chen et al., 2014: Recognizing RGB Images by Learning from RGB-D Data](http://www.cv-foundation.org/openaccess/content_cvpr_2014/papers/Chen_Recognizing_RGB_Images_2014_CVPR_paper.pdf)
+
+2. Again consider image classification, but now imagine that in addition to the
+labels for each training sample you also know the pose of the object in the image. 
+You can use this pose information as an auxiliary prediction task using
+the *multi-task* pattern.<br/>
+Paper: [Zhao & Itti, 2016: Improved Deep Learning of Object Category using Pose Information](https://www.researchgate.net/publication/283734369_Improved_Deep_Learning_of_Object_Category_using_Pose_Information)
+
+3. Another way to use pose information is to use relative poses between
+*pairs of images*. This can be done using the *pairwise transformation pattern*.
+<br/>
+Paper: [Jayaraman & Grauman, 2015: Learning image representations equivariant to ego-motion](http://arxiv.org/pdf/1505.02206.pdf)
+
+4. If you know want your contextual data is much better for predicting the
+target than the input data, you can apply the *direct pattern* to do a regression 
+of the input on the context, and then use the resulting representation to
+predict the targets.
+
+All examples are examples for supervised learning, but contextual learning
+is equally applicable to reinforcement learning:
+[Jonschkowski & Brock, 2015: Learning state representations with robotic priors](http://www.robotics.tu-berlin.de/fileadmin/fg170/Publikationen_pdf/Jonschkowski-15-AURO.pdf)
+
+### Requirements
+
+- [Theano](http://deeplearning.net/software/theano/)
+- [Lasagne](https://github.com/Lasagne/Lasagne)
+
+Follow the installation requirements for these frameworks.
+
+### Running tests
+
+In the concarne repository root, type
+   ```nosetests tests```
+
+### Building the API documentation
+
+In the concarne repository root, type
+
+    cd docs
+    make html
+    
+You can now read the documentation by opening docs/_build/html/index.html
+
+### Disclaimer
+
 No animals were harmed during the development of this framework.

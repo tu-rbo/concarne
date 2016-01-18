@@ -80,16 +80,16 @@ def load_dataset(tr_data, tr_data_url, test_data, test_data_url):
     
 def load_direct_context_dataset():
     tr_data = "cl_synth_direct_d-50_e-0_n-500_seed-12340.npz"
-    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Fdirect&files=cl_synth_direct_d-50_e-0_n-500_seed-12340.npz&download"
+    tr_data_url = "https://owncloud.tu-berlin.de/index.php/s/QBoweGppuFbW7CB/download"
     test_data = "cl_synth_direct_d-50_e-0_ntest-50000_seed-12340.npz"
-    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Fdirect&files=cl_synth_direct_d-50_e-0_ntest-50000_seed-12340.npz&download"
+    test_data_url = "https://owncloud.tu-berlin.de/index.php/s/QD03NhenHFhZFdT/download"
     return load_dataset(tr_data, tr_data_url, test_data, test_data_url)[1]
 
 def load_embedding_context_dataset():
     tr_data = "cl_synth_embedding_d-50_e-25_n-500_seed-12340.npz"
-    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Fembedding&files=cl_synth_embedding_d-50_e-25_n-500_seed-12340.npz&download"
+    tr_data_url = "https://owncloud.tu-berlin.de/index.php/s/3YYrcGP0pKHPDvI/download"
     test_data = "cl_synth_embedding_d-50_e-25_ntest-50000_seed-12340.npz"
-    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Fembedding&files=cl_synth_embedding_d-50_e-25_ntest-50000_seed-12340.npz&download"
+    test_data_url = "https://owncloud.tu-berlin.de/index.php/s/zJOrVXiQ6KY0owD/download"
 
     (npz_train, npz_test), res = \
       load_dataset(tr_data, tr_data_url, test_data, test_data_url)
@@ -101,9 +101,9 @@ def load_embedding_context_dataset():
 
 def load_relative_context_dataset():
     tr_data = "cl_synth_relative_d-50_e-0_n-500_seed-12340.npz"
-    tr_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Frelative&files=cl_synth_relative_d-50_e-0_n-500_seed-12340.npz&download"
+    tr_data_url = "https://owncloud.tu-berlin.de/index.php/s/D5Wi67IDtbeMXG2/download"
     test_data = "cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz"
-    test_data_url = "https://tubcloud.tu-berlin.de/public.php?service=files&t=865193384483af385172f5871aa5cd36&path=%2Fsynthetic_data%2Frelative&files=cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz&download"
+    test_data_url = "https://owncloud.tu-berlin.de/index.php/s/KD0toz7t4ZBa5q5/download"
 
     (_,_), (X, Y, C, X_valid, Y_valid, X_test, Y_test) \
        = load_dataset(tr_data, tr_data_url, test_data, test_data_url)
@@ -123,92 +123,186 @@ def build_linear_simple(input_layer, n_out, nonlinearity=None, name=None):
 
 #  ########################## Build Direct Pattern ###############################
 def build_direct_pattern(input_var, target_var, context_var, n, m, num_classes):
-    input_layer = lasagne.layers.InputLayer(shape=(None, n),
-                                        input_var=input_var)
-    phi = build_linear_simple( input_layer, m, name="phi")
-    psi = build_linear_simple( phi, num_classes, 
-        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
     
-    # if you want to change the standard loss terms used by a pattern
-    # you can define them here and pass them to the Pattern object
-    #   target_loss=lasagne.objectives.categorical_crossentropy(
-    #       psi.get_output_for(phi.get_output_for(input_var)), 
-    #       target_var)    
-    #   context_loss=lasagne.objectives.squared_error(
-    #       phi.get_output_for(input_var), 
-    #       context_var)
-        
-    # alternatively - and even easier - you can also just pass the lasagne
-    # objective function and the pattern will automatically figure out
-    # inputs and outputs:
-    #  target_loss=lasagne.objectives.categorical_crossentropy,
-    #  context_loss=lasagne.objectives.squared_error
+    # Alternative 1: defining by explicitly building the functions:    
+#    input_layer = lasagne.layers.InputLayer(shape=(None, n),
+#                                        input_var=input_var)
+#    phi = build_linear_simple( input_layer, m, name="phi")
+#    psi = build_linear_simple( phi, num_classes, 
+#        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
+#        
+#    dp = concarne.patterns.DirectPattern(phi=phi, psi=psi, 
+#                                         target_var=target_var, 
+#                                         context_var=context_var,
+#                                         target_loss=lasagne.objectives.categorical_crossentropy,
+#                                         context_loss=lasagne.objectives.squared_error
+#                                         )
+
+    # Alternative 2: defining by lists - this frees you from thinking
+    # about how to define the input and output shapes and how to stitch
+    # together the functions - this will be automatically inferred by the pattern.
+    # therefore, we prefer this style
+    phi = [ (lasagne.layers.DenseLayer, 
+             { 'num_units': concarne.patterns.Pattern.PHI_OUTPUT_SHAPE,
+               'nonlinearity':None, 'b':None })]
+    
+    psi = [ (lasagne.layers.DenseLayer, 
+             { 'num_units': concarne.patterns.Pattern.PSI_OUTPUT_SHAPE,
+               'nonlinearity':lasagne.nonlinearities.softmax, 'b':None })]
         
     dp = concarne.patterns.DirectPattern(phi=phi, psi=psi, 
+                                         input_var=input_var, 
                                          target_var=target_var, 
                                          context_var=context_var,
+                                         input_shape=n, 
+                                         target_shape=num_classes, 
+                                         context_shape=m,
+                                         representation_shape=m,
                                          target_loss=lasagne.objectives.categorical_crossentropy,
                                          context_loss=lasagne.objectives.squared_error
-                                         )
+                                         )                                         
     return dp
 
 #  ########################## Build Multi-task Pattern ###############################
 def build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_classes):
-    input_layer = lasagne.layers.InputLayer(shape=(None, n),
-                                        input_var=input_var)
-    phi = build_linear_simple( input_layer, d, name="phi")
-    psi = build_linear_simple( phi, num_classes, 
-        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
-    beta = build_linear_simple( phi, m, name="beta")
-        
+    # Alternative 1: explicit
+#    input_layer = lasagne.layers.InputLayer(shape=(None, n),
+#                                        input_var=input_var)
+#                                        
+#    phi = build_linear_simple( input_layer, d, name="phi")
+#    psi = build_linear_simple( phi, num_classes, 
+#        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
+#    beta = build_linear_simple( phi, m, name="beta")
+#        
+#    mtp = concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta,
+#                                         target_var=target_var, 
+#                                         context_var=context_var,
+#                                         context_loss=lasagne.objectives.squared_error,
+#                                         )
+                                         
+    # Alternative 2
+    phi = [ (lasagne.layers.DenseLayer, 
+             { 'num_units': concarne.patterns.Pattern.PHI_OUTPUT_SHAPE,
+               'nonlinearity':None, 'b':None })]
+    
+    psi = [ (lasagne.layers.DenseLayer, 
+             { 'num_units': concarne.patterns.Pattern.PSI_OUTPUT_SHAPE,
+               'nonlinearity':lasagne.nonlinearities.softmax, 'b':None })]
+
+    beta = [ (lasagne.layers.DenseLayer, 
+             { 'num_units': concarne.patterns.Pattern.BETA_OUTPUT_SHAPE,
+               'nonlinearity':None, 'b':None })]
+                                        
     mtp = concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta,
+                                         input_var=input_var, 
                                          target_var=target_var, 
                                          context_var=context_var,
-                                         context_loss=lasagne.objectives.squared_error,
-                                         )
+                                         input_shape=n, 
+                                         target_shape=num_classes, 
+                                         context_shape=m,
+                                         representation_shape=d,
+                                         target_loss=lasagne.objectives.categorical_crossentropy,
+                                         context_loss=lasagne.objectives.squared_error
+                                         )    
     return mtp
     
 #  ########################## Build Multi-view Pattern ###############################
 def build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_classes):
-    input_layer = lasagne.layers.InputLayer(shape=(None, n),
-                                        input_var=input_var)
-    context_input_layer = lasagne.layers.InputLayer(shape=(None, m),
-                                        input_var=context_var)
-    phi = build_linear_simple( input_layer, d, name="phi")
-    psi = build_linear_simple( phi, num_classes, 
-        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
-    beta = build_linear_simple( context_input_layer, d, name="beta")
-        
+    # Alternative 1: explicit
+#    input_layer = lasagne.layers.InputLayer(shape=(None, n),
+#                                        input_var=input_var)
+#    context_input_layer = lasagne.layers.InputLayer(shape=(None, m),
+#                                        input_var=context_var)
+#    phi = build_linear_simple( input_layer, d, name="phi")
+#    psi = build_linear_simple( phi, num_classes, 
+#        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
+#    beta = build_linear_simple( context_input_layer, d, name="beta")
+#        
+#    mtp = concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta,
+#                                         target_var=target_var, 
+#                                         context_var=context_var,
+#                                         context_loss=lasagne.objectives.squared_error,
+#                                         )
+
+    # Alternative 2
+    phi = [ (lasagne.layers.DenseLayer, 
+             { 'num_units': concarne.patterns.Pattern.PHI_OUTPUT_SHAPE,
+               'nonlinearity':None, 'b':None })]
+    
+    psi = [ (lasagne.layers.DenseLayer, 
+             { 'num_units': concarne.patterns.Pattern.PSI_OUTPUT_SHAPE,
+               'nonlinearity':lasagne.nonlinearities.softmax, 'b':None })]
+
+    beta = [ (lasagne.layers.DenseLayer, 
+             { 'num_units': concarne.patterns.Pattern.BETA_OUTPUT_SHAPE,
+               'nonlinearity':None, 'b':None })]
+                                        
     mtp = concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta,
+                                         input_var=input_var, 
                                          target_var=target_var, 
                                          context_var=context_var,
-                                         context_loss=lasagne.objectives.squared_error,
-                                         )
+                                         input_shape=n, 
+                                         target_shape=num_classes, 
+                                         context_shape=m,
+                                         representation_shape=d,
+                                         target_loss=lasagne.objectives.categorical_crossentropy,
+                                         context_loss=lasagne.objectives.squared_error
+                                         )    
+                                         
     return mtp    
     
 #  ########################## Build Pairwise Pattern ###############################
 
 def build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m, num_classes):
-    input_layer = lasagne.layers.InputLayer(shape=(None, n),
-                                        input_var=input_var)
-    phi = build_linear_simple( input_layer, m, name="phi")
-    psi = build_linear_simple( phi, num_classes, 
-        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
+    # Alternative 1
+#    input_layer = lasagne.layers.InputLayer(shape=(None, n),
+#                                        input_var=input_var)
+#    phi = build_linear_simple( input_layer, m, name="phi")
+#    psi = build_linear_simple( phi, num_classes, 
+#        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
+#    
+#    # optionally, we can also learn parameters for beta.
+#    # here it does not make much sense because all transformations
+#    # are linear.
+#    #beta = build_linear_simple( phi, m, name="beta")
+#    
+#    # otherwise, we just set beta=None, which will make beta the identity
+#    beta = None
+#        
+#    pptp = concarne.patterns.PairwisePredictTransformationPattern(phi=phi, psi=psi, 
+#                                         beta=beta,
+#                                         target_var=target_var, 
+#                                         context_var=context_var,
+#                                         context_transform_var=context_transform_var,
+#                                         )
+
+    # Alternative 2
+    phi = [ (lasagne.layers.DenseLayer, 
+             { 'num_units': concarne.patterns.Pattern.PHI_OUTPUT_SHAPE,
+               'nonlinearity':None, 'b':None })]
     
+    psi = [ (lasagne.layers.DenseLayer, 
+             { 'num_units': concarne.patterns.Pattern.PSI_OUTPUT_SHAPE,
+               'nonlinearity':lasagne.nonlinearities.softmax, 'b':None })]
+
     # optionally, we can also learn parameters for beta.
     # here it does not make much sense because all transformations
     # are linear.
-    #beta = build_linear_simple( phi, m, name="beta")
-    
-    # otherwise, we just set beta=None, which will make beta the identity
     beta = None
-        
-    pptp = concarne.patterns.PairwisePredictTransformationPattern(phi=phi, psi=psi, 
-                                         beta=beta,
+                                        
+    pptp = concarne.patterns.PairwisePredictTransformationPattern(phi=phi, psi=psi, beta=beta,
+                                         input_var=input_var, 
                                          target_var=target_var, 
                                          context_var=context_var,
                                          context_transform_var=context_transform_var,
-                                         )
+                                         input_shape=n, 
+                                         target_shape=num_classes, 
+                                         context_shape=m,
+                                         representation_shape=m,
+                                         target_loss=lasagne.objectives.categorical_crossentropy,
+                                         context_loss=lasagne.objectives.squared_error
+                                         )    
+                                         
     return pptp
 
 
