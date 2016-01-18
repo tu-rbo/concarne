@@ -42,7 +42,7 @@ class AlignedBatchIterator(object):
         
         Assumes that all numpy arrays are of equal length.
         
-        Inspired by the BatchIterator class used in nolearn..
+        Inspired by the BatchIterator class used in nolearn.
         https://github.com/dnouri/nolearn
         Copyright (c) 2012-2015 Daniel Nouri
         
