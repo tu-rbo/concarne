@@ -13,8 +13,8 @@ import lasagne.objectives
 
 class DirectPattern(Pattern):
     """
-    The :class:`DirectPattern` is the simplest contextual pattern where 
-    c is used directly as the target representation s = phi(x)::
+    The :class:`DirectPattern` is the simplest learning with side information pattern   
+    where c is used directly as the target representation s = phi(x)::
     
      x ----> s -----> y
        phi   |  psi
@@ -27,7 +27,7 @@ class DirectPattern(Pattern):
         return lasagne.objectives.categorical_crossentropy  
   
     @property  
-    def default_context_objective(self):
+    def default_side_objective(self):
         return lasagne.objectives.squared_error
 
   
@@ -36,21 +36,21 @@ class DirectPattern(Pattern):
         super(DirectPattern, self).__init__(**kwargs)
 
         self._create_target_objective()
-        self._create_context_objective()                                     
+        self._create_side_objective()                                     
 
-    def _create_context_objective(self):
-        if self.context_loss is None:
+    def _create_side_objective(self):
+        if self.side_loss is None:
             assert (self.input_var is not None)
-            assert (self.context_var is not None)
+            assert (self.side_var is not None)
             
-            if self.context_loss_fn is None:
-                fn = self.default_context_objective
+            if self.side_loss_fn is None:
+                fn = self.default_side_objective
             else:
-                #print ("Context loss is function object: %s" % str(self.context_loss_fn))
-                fn = self.context_loss_fn
+                #print ("Side loss is function object: %s" % str(self.side_loss_fn))
+                fn = self.side_loss_fn
             
-            self.context_loss = fn(
-                self.get_phi_output_for(self.input_var), self.context_var
+            self.side_loss = fn(
+                self.get_phi_output_for(self.input_var), self.side_var
             ).mean()
             
             

@@ -26,7 +26,7 @@ class TestPatternBase(object):
     """
     
     def __init__(self):
-        self.loss_weights = {'target_weight':0.9, 'context_weight':0.1}
+        self.loss_weights = {'target_weight':0.9, 'side_weight':0.1}
     
         self.phi = None
         self.psi = None
@@ -51,7 +51,7 @@ class TestPatternBase(object):
 
     def init_variables(self):
         self.input_var = T.matrix('inputs')
-        self.context_var = T.matrix('contexts')
+        self.side_var = T.matrix('contexts')
         # do regression
         #self.target_var = T.ivector('targets')
         self.target_var = T.vector('targets')
@@ -78,7 +78,7 @@ class TestSinglePatternBase(TestPatternBase):
           test cases with nosetests is problematic (and not very transparent)"""
           
         loss = self.pattern.training_loss(**self.loss_weights).mean()
-        train_fn_inputs = [self.input_var, self.target_var, self.context_var]
+        train_fn_inputs = [self.input_var, self.target_var, self.side_var]
         
         train_fn = theano.function(train_fn_inputs, loss)
         assert (train_fn(self.X, self.Y, self.C) > 0)
@@ -100,7 +100,7 @@ class TestSinglePatternBase(TestPatternBase):
 
     def _test_learn(self):
         loss = self.pattern.training_loss(**self.loss_weights).mean()
-        train_fn_inputs = [self.input_var, self.target_var, self.context_var]
+        train_fn_inputs = [self.input_var, self.target_var, self.side_var]
         
         params = lasagne.layers.get_all_params(self.pattern, trainable=True)
         
@@ -146,7 +146,7 @@ class TestDirectPattern(TestSinglePatternBase):
     """
 
     def setup(self):
-        # define direct context data
+        # define direct side data
         self.C = np.array( [[0,1,2,3,4], ] ).T
         self.m = self.C.shape[1]
     
@@ -165,7 +165,7 @@ class TestDirectPattern(TestSinglePatternBase):
         
         self.pattern = concarne.patterns.DirectPattern(phi=self.phi, psi=self.psi, 
                                              target_var=self.target_var, 
-                                             context_var=self.context_var,
+                                             side_var=self.side_var,
                                              target_loss=self.target_loss
                                              )
 
@@ -202,7 +202,7 @@ class TestMultiViewPattern(TestSinglePatternBase):
         # define embedded C
         self.C = np.array( [[0,1,2,3,4], [2,2,2,2,2]] ).T
         
-        # dim of context
+        # dim of side info
         self.m = self.C.shape[1]
         
         # size of desired intermediate representation
@@ -213,19 +213,19 @@ class TestMultiViewPattern(TestSinglePatternBase):
     def build_pattern(self):
         self.input_layer = lasagne.layers.InputLayer(shape=(None, self.n),
                                             input_var=self.input_var)
-        self.context_input_layer = lasagne.layers.InputLayer(shape=(None, self.m),
-                                            input_var=self.context_var)
+        self.side_input_layer = lasagne.layers.InputLayer(shape=(None, self.m),
+                                            input_var=self.side_var)
         self.phi = build_linear_simple( self.input_layer, self.d, name="phi")
         self.psi = build_linear_simple( self.phi, self.num_classes, 
             nonlinearity=None, name="psi")
-        self.beta = build_linear_simple( self.context_input_layer, self.d, name="beta")
+        self.beta = build_linear_simple( self.side_input_layer, self.d, name="beta")
             
         self.build_target_loss()
         
         self.pattern = concarne.patterns.MultiViewPattern(phi=self.phi, psi=self.psi, 
                                              beta=self.beta,
                                              target_var=self.target_var, 
-                                             context_var=self.context_var,
+                                             side_var=self.side_var,
                                              target_loss=self.target_loss,
                                              )
 
@@ -248,7 +248,7 @@ class TestMultiViewPattern(TestSinglePatternBase):
         assert ( np.all(X_hat == self.S) )
 
         beta_prediction = lasagne.layers.get_output(self.beta, deterministic=True)
-        beta_fn = theano.function([self.context_var], beta_prediction)
+        beta_fn = theano.function([self.side_var], beta_prediction)
         C_hat = beta_fn(self.C)
         assert ( np.all(C_hat == self.S) )
 
@@ -269,7 +269,7 @@ class TestMultiTaskPattern(TestSinglePatternBase):
         # define embedded C
         self.C = np.array( [[0,1,2,3,4], [2,2,2,2,2]] ).T
         
-        # dim of context
+        # dim of side info
         self.m = self.C.shape[1]
         
         # size of desired intermediate representation
@@ -290,7 +290,7 @@ class TestMultiTaskPattern(TestSinglePatternBase):
         self.pattern = concarne.patterns.MultiTaskPattern(phi=self.phi, psi=self.psi, 
                                              beta=self.beta,
                                              target_var=self.target_var, 
-                                             context_var=self.context_var,
+                                             side_var=self.side_var,
                                              target_loss=self.target_loss,
                                              )
 
@@ -340,7 +340,7 @@ class TestPWTransformationPattern(TestPatternBase):
         self.CX = np.array( [[1,2,3,4,5], [2,2,2,2,2]] ).T
         self.Cy = -np.array( [[1,1,1,1,1]] ).T
         
-        # dim of context input == dim of X
+        # dim of side info input == dim of X
         self.m = self.CX.shape[1]
         
         # size of desired intermediate representation
@@ -351,7 +351,7 @@ class TestPWTransformationPattern(TestPatternBase):
         assert(self.CX.shape[1] == self.X.shape[1])
         
     def build_pattern(self):
-        self.context_transform_var = T.matrix('context_transforms')
+        self.side_transform_var = T.matrix('side_transforms')
         
         self.input_layer = lasagne.layers.InputLayer(shape=(None, self.n),
                                             input_var=self.input_var)
@@ -365,9 +365,9 @@ class TestPWTransformationPattern(TestPatternBase):
         self.pattern = concarne.patterns.PairwisePredictTransformationPattern(phi=self.phi, psi=self.psi, 
                                              beta=self.beta,
                                              target_var=self.target_var, 
-                                             context_var=self.context_var,
+                                             side_var=self.side_var,
                                              target_loss=self.target_loss,
-                                             context_transform_var=self.context_transform_var,
+                                             side_transform_var=self.side_transform_var,
                                              )
 
     def test_pattern_output(self):
@@ -393,15 +393,15 @@ class TestPWTransformationPattern(TestPatternBase):
         
         
 #        self.phi1 = test_prediction
-#        self.phi2 = lasagne.layers.get_output(self.pattern, self.context_var, deterministic=True)
-        beta_prediction = self.pattern.get_beta_output_for(self.input_var, self.context_var, deterministic=True)
-        beta_fn = theano.function([self.input_var, self.context_var], beta_prediction)
+#        self.phi2 = lasagne.layers.get_output(self.pattern, self.side_var, deterministic=True)
+        beta_prediction = self.pattern.get_beta_output_for(self.input_var, self.side_var, deterministic=True)
+        beta_fn = theano.function([self.input_var, self.side_var], beta_prediction)
         C_hat = beta_fn(self.X, self.CX)
         assert ( np.all(C_hat == self.Cy) )
 
     def test_pattern_training_loss_and_grads(self):
         loss = self.pattern.training_loss(**self.loss_weights).mean()
-        train_fn_inputs = [self.input_var, self.target_var, self.context_var, self.context_transform_var]
+        train_fn_inputs = [self.input_var, self.target_var, self.side_var, self.side_transform_var]
         
         train_fn = theano.function(train_fn_inputs, loss)
         assert (train_fn(self.X, self.Y, self.CX, self.Cy) > 0)
@@ -423,7 +423,7 @@ class TestPWTransformationPattern(TestPatternBase):
 
     def test_learn(self):
         loss = self.pattern.training_loss(**self.loss_weights).mean()
-        train_fn_inputs = [self.input_var, self.target_var, self.context_var, self.context_transform_var]
+        train_fn_inputs = [self.input_var, self.target_var, self.side_var, self.side_transform_var]
         
         params = lasagne.layers.get_all_params(self.pattern, trainable=True)
         

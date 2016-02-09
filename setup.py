@@ -33,7 +33,7 @@ tests_require = [
 
 setup(name='concarne',
     version=version,
-    description='Lightweight contextual learning framework, based on Theano and Lasagne',
+    description='Lightweight framework for learning with side information, based on Theano and Lasagne',
     long_description=README,
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -48,7 +48,7 @@ setup(name='concarne',
     keywords="",
     author='Sebastian Hoefer, Rico Jonschkowski',
     author_email='sebastian.hoefer@tu-berlin.de, rico.jonschkowski@tu-berlin.de',
-    url='https://gitlab.tubit.tu-berlin.de/rbo-lab/concarne',
+    url='https://github.com/tu-rbo/concarne',
     license="MIT",
     packages=find_packages(),
     include_package_data=False,

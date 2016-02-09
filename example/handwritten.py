@@ -156,36 +156,36 @@ def build_regressor(network, n_out, name='reg'):
 
 
 # ########################## Build Direct Pattern ###############################
-def build_direct_pattern(input_var, target_var, context_var, input_shape, n_hidden, num_classes):
+def build_direct_pattern(input_var, target_var, side_var, input_shape, n_hidden, num_classes):
     phi = build_conv_net(input_var, input_shape, n_hidden)
     psi = build_classifier(phi, num_classes)
-    return concarne.patterns.DirectPattern(phi=phi, psi=psi, target_var=target_var, context_var=context_var)
+    return concarne.patterns.DirectPattern(phi=phi, psi=psi, target_var=target_var, side_var=side_var)
 
 
 # ########################## Build Multi-task Pattern ###############################
-def build_multitask_pattern(input_var, target_var, context_var, input_shape, n_hidden, num_classes, n_out_context,
+def build_multitask_pattern(input_var, target_var, side_var, input_shape, n_hidden, num_classes, n_out_side,
                             discrete=True):
     phi = build_conv_net(input_var, input_shape, n_hidden, name='phi')
     psi = build_classifier(phi, num_classes, name='psi')
     if discrete:
-        beta = build_classifier(phi, n_out_context, name='beta')
-        context_loss = lasagne.objectives.categorical_crossentropy(lasagne.layers.get_output(beta), context_var).mean()
+        beta = build_classifier(phi, n_out_side, name='beta')
+        side_loss = lasagne.objectives.categorical_crossentropy(lasagne.layers.get_output(beta), side_var).mean()
     else:
-        beta = build_regressor(phi, n_out_context, name='beta')
-        context_loss = lasagne.objectives.squared_error(lasagne.layers.get_output(beta), context_var).mean()
+        beta = build_regressor(phi, n_out_side, name='beta')
+        side_loss = lasagne.objectives.squared_error(lasagne.layers.get_output(beta), side_var).mean()
 
     return concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta, target_var=target_var,
-                                              context_var=context_var, context_loss=context_loss)
+                                              side_var=side_var, side_loss=side_loss)
 
 
 #  ########################## Build Multi-view Pattern ###############################
-def build_multiview_pattern(input_var, target_var, context_var, input_shape, n_hidden, num_classes):
+def build_multiview_pattern(input_var, target_var, side_var, input_shape, n_hidden, num_classes):
     phi = build_conv_net(input_var, input_shape, n_hidden,name='phi')
     psi = build_classifier(phi, num_classes,name='phi')
     beta = build_view_net(input_var, input_shape, n_hidden,name='beta')
 
     return concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta, target_var=target_var,
-                                              context_var=context_var)
+                                              side_var=side_var)
 
 
 # ########################## Main ###############################
@@ -199,7 +199,7 @@ def main(pattern, data_representation, procedure, num_epochs, batchsize):
     if pattern == "multiview":
         assert (procedure == "simultaneous")
 
-    iterate_context_minibatches = None
+    iterate_side_minibatches = None
 
     # ------------------------------------------------------
     # Load data and prepare Theano variables
@@ -209,45 +209,45 @@ def main(pattern, data_representation, procedure, num_epochs, batchsize):
     input_var = T.tensor4('inputs')
     target_var = T.ivector('targets')
 
-    # prepare context data
+    # prepare side data
     if data_representation == 'discrete':
 
-        # discretize context data into 32 classes using kmeans
+        # discretize side data into 32 classes using kmeans
         kmeans = cluster.KMeans(n_clusters=32, n_init=100)  # init=centers)
         C_train = kmeans.fit_predict(C_train)
-        context_var = T.ivector('contexts')
+        side_var = T.ivector('sideinfo')
 
         if pattern in ['direct', 'multiview']:
             # for the direct pattern, we need to explicitly apply one-hot representation to the data
             v = T.vector()
             one_hot = theano.function([v], lasagne.utils.one_hot(v))
             C_train = one_hot(C_train)
-            context_var = T.matrix('contexts')
+            side_var = T.matrix('sideinfo')
     else:
 
-        # subsample context to have the same dimension as the intermediate representation (required for direct pattern)
+        # subsample side info to have the same dimension as the intermediate representation (required for direct pattern)
         C_train = C_train[:, ::2]
-        context_var = T.matrix('contexts')
+        side_var = T.matrix('sideinfo')
 
     # ------------------------------------------------------
     # Build pattern
     learning_rate = 0.003
     momentum = 0.5
-    loss_weights = {'target_weight': 0.5, 'context_weight': 0.5}  # default to uniform weighting
+    loss_weights = {'target_weight': 0.5, 'side_weight': 0.5}  # default to uniform weighting
     if pattern == "direct":
-        pattern = build_direct_pattern(input_var, target_var, context_var, input_shape=(None, 1, 32, 32),
+        pattern = build_direct_pattern(input_var, target_var, side_var, input_shape=(None, 1, 32, 32),
                                        n_hidden=32, num_classes=num_classes)
 
     elif pattern == "multitask":
-        pattern = build_multitask_pattern(input_var, target_var, context_var,
+        pattern = build_multitask_pattern(input_var, target_var, side_var,
                                           input_shape=(None, 1, 32, 32), n_hidden=32, num_classes=num_classes,
-                                          n_out_context=32, discrete=data_representation == 'discrete')
+                                          n_out_side=32, discrete=data_representation == 'discrete')
 
     elif pattern == "multiview":
-        pattern = build_multitask_pattern(input_var, target_var, context_var,
+        pattern = build_multitask_pattern(input_var, target_var, side_var,
                                           input_shape=(None, 1, 32, 32), n_hidden=32, num_classes=num_classes,
-                                          n_out_context=32, discrete=data_representation == 'discrete')
-        loss_weights = {'target_weight': 0.99, 'context_weight': 0.01}
+                                          n_out_side=32, discrete=data_representation == 'discrete')
+        loss_weights = {'target_weight': 0.99, 'side_weight': 0.01}
 
     else:
         print("Pattern {} not implemented.".format(pattern))
@@ -263,7 +263,7 @@ def main(pattern, data_representation, procedure, num_epochs, batchsize):
                                                momentum,
                                                procedure,
                                                loss_weights['target_weight'],
-                                               loss_weights['context_weight'])
+                                               loss_weights['side_weight'])
     print("Starting training...")
     trainer.fit_XC_XY(X_train, [C_train], X_sup, y_sup, X_val=X_test, y_val=y_test, verbose=True)
 
@@ -279,7 +279,7 @@ if __name__ == '__main__':
     parser.add_argument("pattern", type=str, help="which pattern to use",
                         default='multitask', nargs='?',
                         choices=['direct', 'multitask', 'multiview'])
-    parser.add_argument("data_representation", type=str, help="which context data to load",
+    parser.add_argument("data_representation", type=str, help="which side information data to load",
                         default='discrete', nargs='?',
                         choices=['continuous', 'discrete'])
     parser.add_argument("training_procedure", type=str, help="which training procedure to use",

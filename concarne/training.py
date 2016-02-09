@@ -23,10 +23,10 @@ class PatternTrainer(object):
        Example with aligned data X_train, y_train and C_train::
        
         > pt = concarne.training.PatternTrainer(pattern, 5, 0.0001, 50, 
-                     target_weight=0.9, context_weight=0.1, verbose=True)
+                     target_weight=0.9, side_weight=0.1, verbose=True)
         > pt.fit_XYC(X_train, y_train, C_train, X_val=X_val, y_val=y_val)
             Training procedure: simultaneous
-             Optimize phi & psi & beta using a weighted sum of target and contextual objective
+             Optimize phi & psi & beta using a weighted sum of target and side objective
                -> standard mode with single training function
             Starting training...
             Epoch 1 of 5 took 0.055s
@@ -55,14 +55,14 @@ class PatternTrainer(object):
               accuracy:             97.21 %            
 
        If in your task, you have more (or simply a different amount of)
-       contextual data available than labels, you can use the method 
+       side information available than labels, you can use the method 
        fit_XC_XY::
        
         > pt.fit_XC_XY(X_train, C_train, X_train2, y_train, X_val=X_val, y_val=y_val)
         
        In the simultaneous procedure, instead of jointly optimizing the
        gradient for combined objective, we alternate the computation of the
-       gradient for the  contextual and the target objectives (minibatch-wise).
+       gradient for the side and the target objectives (minibatch-wise).
 
        Parameters
        ----------       
@@ -81,14 +81,14 @@ class PatternTrainer(object):
             Three training procedures are supported. decoupled and 
             pretrain_finetune both use a two stage process, whereas
             simultaneous optimizes a linear combination of the target and
-            contextual losses. decoupled is only applicable if the
-            contextual loss provides enough guidance to learn a good 
+            side losses. decoupled is only applicable if the
+            side loss provides enough guidance to learn a good 
             representation s, since in the second training phase 
             :math:`\phi` is not changed anymore. In pretrain_finetune,
             :math:`\phi` is also optimized in the second training phase.
         target_weight: float, optional
             only required for simultaneous training procedure
-        context_weight: float, optional
+        side_weight: float, optional
             only required for simultaneous training procedure
         test_objective: lasagne objective function, optional
             The appropriate test objective for the target task.
@@ -106,7 +106,7 @@ class PatternTrainer(object):
                  momentum=0.9,
                  procedure="simultaneous", 
                  target_weight=None, 
-                 context_weight=None,
+                 side_weight=None,
                  test_objective=lasagne.objectives.categorical_crossentropy,
                  verbose=None):
         self.pattern = pattern
@@ -117,13 +117,13 @@ class PatternTrainer(object):
         self.procedure = procedure
         assert (procedure in ["simultaneous", "decoupled", "pretrain_finetune"])
         
-        # target_weight and context_weight are only relevant for simultaneous
+        # target_weight and side_weight are only relevant for simultaneous
         self.loss_weights = {}
         if self.procedure == "simultaneous":
             if target_weight is not None:
                 self.loss_weights['target_weight'] = target_weight
-            if context_weight is not None:
-                self.loss_weights['context_weight'] = context_weight
+            if side_weight is not None:
+                self.loss_weights['side_weight'] = side_weight
         
         self.test_objective = test_objective
         
@@ -197,8 +197,8 @@ class PatternTrainer(object):
         Y :  numpy array
             Labels / target data
         Cs:  list of numpy arrays/lists
-            Context data - even if the pattern / iterator only expects the
-            value for one context variable, you MUST give a list here
+            Side information - even if the pattern / iterator only expects the
+            value for one side variable, you MUST give a list here
         batch_iterator: iterator, optional
             Your custom iterator class that accepts X,Y,C1,..Cn as inputs
         X_val: numpy array, optional
@@ -208,8 +208,8 @@ class PatternTrainer(object):
         """
 
         if not isiterable(Cs):
-            raise Exception("Make sure that you provide a list of context "
-                + " data Cs, even if the pattern only expects one context variable")
+            raise Exception("Make sure that you provide a list of side "
+                + " information Cs, even if the pattern only expects one side variable")
 
         if batch_iterator is None:
             batch_iterator = AlignedBatchIterator(self.batch_size, shuffle=True)
@@ -232,11 +232,11 @@ class PatternTrainer(object):
        Parameters
        ----------       
         X1 :  numpy array
-            Input data use for optimizing contextual objective 
+            Input data use for optimizing side objective 
             (rows: samples, cols: features)
         Cs:  list of numpy arrays/lists
-            Context data - even if the pattern / iterator only expects the
-            value for one context variable, you MUST give a list here
+            Side information - even if the pattern / iterator only expects the
+            value for one side variable, you MUST give a list here
         X1 :  numpy array
             Input data use for optimizing target objective 
             (rows: samples, cols: features)
@@ -253,8 +253,8 @@ class PatternTrainer(object):
         """
         
         if not isiterable(Cs):
-            raise Exception("Make sure that you provide a list of context "
-                + " data Cs, even if the pattern only expects one context variable")
+            raise Exception("Make sure that you provide a list of side "
+                + " information Cs, even if the pattern only expects one side variable")
 
         if batch_iterator_XY is None:
             batch_iterator_XY = AlignedBatchIterator(self.batch_size, shuffle=True)
@@ -291,7 +291,7 @@ class PatternTrainer(object):
         train_vars_phase2 = train_vars_phase1
         if data_alignment == "XC_XY":
             # alternating: two train_fn, one accepting X,C, two accepting X,Y
-            train_vars_phase1 = [self.pattern.input_var] + list(self.pattern.context_vars) # XC
+            train_vars_phase1 = [self.pattern.input_var] + list(self.pattern.side_vars) # XC
             train_vars_phase2 = [self.pattern.input_var, self.pattern.target_var] # XY
 
         # ========================================================
@@ -299,10 +299,10 @@ class PatternTrainer(object):
             # ---------------------
             # first training phase
             if verbose:
-                print ("Optimize phi & beta using the contextual objective")
+                print ("Optimize phi & beta using the side objective")
                 
             train_fn = self._compile_train_fn(train_vars_phase1,
-                                              loss_weights={'target_weight': 0.0, 'context_weight': 1.0}, 
+                                              loss_weights={'target_weight': 0.0, 'side_weight': 1.0}, 
                                               tags= {'psi': False}, )
             # passing X_val and y_val doesn't make sense because psi is not trained
             self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]], verbose=verbose)
@@ -313,27 +313,27 @@ class PatternTrainer(object):
                 if verbose:
                     print ("=====\nOptimize psi using the target objective")
                 train_fn = self._compile_train_fn(train_vars_phase2,
-                                                  loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
+                                                  loss_weights={'target_weight': 1.0, 'side_weight': 0.0}, 
                                                   tags= {'phi': False, 'beta': False }, ) # beta: False is implicit
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
             elif self.procedure == 'pretrain_finetune':
                 if verbose:
                     print ("=====\nOptimize psi using the target objective")
                 train_fn = self._compile_train_fn(train_vars_phase2,
-                                                  loss_weights={'target_weight': 1.0, 'context_weight': 0.0}, 
+                                                  loss_weights={'target_weight': 1.0, 'side_weight': 0.0}, 
                                                   tags= {'psi': True}, )
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
                 if verbose:
                     print ("=====\nOptimize phi & psi using the target objective")
                 train_fn = self._compile_train_fn(train_vars_phase2,
-                                                  loss_weights={'target_weight': 1.0, 'context_weight': 0.0},
+                                                  loss_weights={'target_weight': 1.0, 'side_weight': 0.0},
                                                   tags= {'beta': False}, )
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
 
         # ========================================================
         elif self.procedure == 'simultaneous':
             if verbose:
-                print ("Optimize phi & psi & beta using a weighted sum of target and contextual objective")
+                print ("Optimize phi & psi & beta using a weighted sum of target and side objective")
             if data_alignment == "XYC":
                 print ("   -> standard mode with single training function")
                 train_fn = self._compile_train_fn(self.pattern.training_input_vars,
@@ -349,7 +349,7 @@ class PatternTrainer(object):
                     tags= {'psi': False} ) 
 
                 lw2 = copy.copy(self.loss_weights)
-                lw2['context_weight'] = 0.
+                lw2['side_weight'] = 0.
                 train_fn2 = self._compile_train_fn(train_vars_phase2,
                     loss_weights=lw2, 
                     tags= {'beta': False} )

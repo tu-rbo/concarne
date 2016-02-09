@@ -13,7 +13,7 @@ import inspect
 
 class Pattern(object):
     """
-    The :class:`Pattern` class represents a contextual pattern and
+    The :class:`Pattern` class represents a side information pattern and
     should be subclassed when implementing a new pattern.
 
     It is similar to :class:`lasagne.layers.Layer` and mimics some of 
@@ -29,17 +29,16 @@ class Pattern(object):
         from the intermediate representation s, :math:`\psi(s)=y`
     target_var : theano tensor variable
         Theano variable representing the target. Required for formulating the target loss.
-    context_var: theano tensor variable
+    side_var: theano tensor variable
         Theano variable representing the target.
         The semantics of this variable depend on the pattern.
-        Note that additional context variables might be required by a pattern.
+        Note that additional side variables might be required by a pattern.
     target_loss: theano tensor variable, optional
         Theano expression or lasagne objective for the optimizing the 
         target.
         All patterns have standard objectives applicable here
-    context_loss: theano tensor variable, optional
-        Theano expression or lasagne objective for the contextual 
-        loss.
+    side_loss: theano tensor variable, optional
+        Theano expression or lasagne objective for the side loss.
         All patterns have standard objectives applicable here
     name : string, optional
         An optional name to attach to this layer.
@@ -51,10 +50,10 @@ class Pattern(object):
     
     def __init__(self, 
                  phi, psi, beta=None, 
-                 input_var=None, target_var=None, context_var=None, 
-                 input_shape=None, target_shape=None, context_shape=None, 
+                 input_var=None, target_var=None, side_var=None, 
+                 input_shape=None, target_shape=None, side_shape=None, 
                  representation_shape=None,
-                 target_loss=None, context_loss=None,
+                 target_loss=None, side_loss=None,
                  name=None):
         self.phi = phi
         self.psi = psi
@@ -62,17 +61,17 @@ class Pattern(object):
 
         self.input_var = input_var
         self.target_var = target_var
-        self.context_var = context_var
+        self.side_var = side_var
 
         self.input_shape = input_shape
         self.target_shape = target_shape
-        self.context_shape = context_shape
+        self.side_shape = side_shape
         self.representation_shape = representation_shape
 
         self.target_loss = target_loss
         self.target_loss_fn = None
-        self.context_loss = context_loss
-        self.context_loss_fn = None
+        self.side_loss = side_loss
+        self.side_loss_fn = None
     
         self.name = name
         
@@ -81,9 +80,9 @@ class Pattern(object):
         if isfunction(self.target_loss):
             self.target_loss_fn = self.target_loss
             self.target_loss = None
-        if isfunction(self.context_loss):
-            self.context_loss_fn = self.context_loss
-            self.context_loss = None
+        if isfunction(self.side_loss):
+            self.side_loss_fn = self.side_loss
+            self.side_loss = None
             
         # convert phi, psi and beta to real lasagne layers if they
         # are passed as a list/dictionary
@@ -126,7 +125,7 @@ class Pattern(object):
         """Return the theano variables that are required for training.
             
            Usually this will correspond to 
-           (input_var, target_var, context_var)
+           (input_var, target_var, side_var)
            which is also the default.
             
            Order matters!
@@ -135,14 +134,14 @@ class Pattern(object):
            -------
            tuple of theano tensor variables
         """
-        return (self.input_var, self.target_var, self.context_var)
+        return (self.input_var, self.target_var, self.side_var)
           
     @property
-    def context_vars(self):
+    def side_vars(self):
         """Return the theano variables that are required for training.
             
            Usually this will correspond to 
-           (input_var, target_var, context_var)
+           (input_var, target_var, side_var)
            which is also the default.
             
            Order matters!
@@ -151,7 +150,7 @@ class Pattern(object):
            -------
            tuple of theano tensor variables
         """
-        return (self.context_var, )
+        return (self.side_var, )
           
             
     @property
@@ -170,12 +169,12 @@ class Pattern(object):
   
   
     @property  
-    def default_context_objective(self):
-        """ Return the default contextual objective used by this pattern.
+    def default_side_objective(self):
+        """ Return the default side objective used by this pattern.
             (implementation required)
             
-            The contextual objective can be overridden by passing the 
-            context_loss argument to the constructor of a pattern
+            The side objective can be overridden by passing the 
+            side_loss argument to the constructor of a pattern
 
             Returns
             -------
@@ -588,14 +587,14 @@ class Pattern(object):
             input = self.input_var
         return lasagne.layers.get_output(self.phi, inputs=input, **kwargs)
 
-    def training_loss(self, target_weight=0.5, context_weight=0.5):
+    def training_loss(self, target_weight=0.5, side_weight=0.5):
         # we need to gate because if we set one weight to 0., we might
         # also want to omit the involved theano variables; w/o the if-else
         # we get an "unconnected inputs" error in theano
         loss = 0.
         if target_weight > 0.:
             loss += target_weight * self.target_loss
-        if context_weight > 0.:
-            loss += context_weight * self.context_loss
+        if side_weight > 0.:
+            loss += side_weight * self.side_loss
             
         return loss

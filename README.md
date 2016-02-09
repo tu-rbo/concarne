@@ -1,8 +1,8 @@
 # concarne 
 
-#### a lightweight contextual learning framework, based on Theano and Lasagne 
+#### a lightweight framework for learning with side information, based on Theano and Lasagne 
 
-concarne implements various contextual learning patterns presented in this [paper](http://arxiv.org/abs/1511.06429).
+concarne implements various patterns for learning with side information presented in this [paper](http://arxiv.org/abs/1511.06429).
 
 ### Quickstart
 
@@ -23,38 +23,38 @@ example/handwritten.py
 ### What is concarne?
 
 concarne implements a variety of different patterns that enable to apply
-*contextual learning*. As it depends on Theano and lasagne, you can use 
+*side information*. As it depends on Theano and lasagne, you can use 
 neural network structures that you have developed yourself and easily
-combine them with the contextual task.
+combine them with the side information learning task.
 
-### What is contextual learning?
+### What is learning with side information?
 
 Supervised, semi-supervised, and unsupervised learning estimate a function 
 given input/output samples. Generalization to unseen samples requires making 
 prior assumptions about this function. However, many priors assumptions cannot be defined 
 by only taking the function, its input, and its output into account. 
 
-*Contextual learning* uses *contextual data* to define such priors. Contextual
-data are neither from the input space nor from the output space of the function,
-but include useful information for learning it. Importantly, these contextual
+We uses *side information* to define such priors. Side information are
+data that are neither from the input space nor from the output space of the function,
+but include useful information for learning it. Importantly, these 
 data *are not required during test time*, but only during training time.
 
-Contextual learning subsumes a variety of related approaches, such as 
+Learning with side information subsumes a variety of related approaches, such as 
 - multi-task learning 
 - multi-view learning (or co-learning)
 - Learning using Privileged Information
 - Slow Feature Analysis
 - and others
 
-### Examples for contextual learning?
+### Examples for learning with side information?
 
-To apply contextual learning, you need to have an additional source of data (neither input nor output of your
-classifier/regressor) available during training - the *contextual data*.
+To apply learning with side information, you need to have an additional source of data (neither input nor output of your
+classifier/regressor) available during training - the *side information*.
 However, this additional data is *not required during test time*.
 
 1. Imagine you want to classify images, and during test time you only have RGB
 data available, but during training you also have 3D depth information 
-available. Contextual learning, in particular the multi-view pattern allows you
+available. Learning with side information, in particular the multi-view pattern allows you
 to incorporate the depth data during training time to shape your classifier,
 without making the depth data an input of your classifier.<br/>
 Paper: [Chen et al., 2014: Recognizing RGB Images by Learning from RGB-D Data](http://www.cv-foundation.org/openaccess/content_cvpr_2014/papers/Chen_Recognizing_RGB_Images_2014_CVPR_paper.pdf)
@@ -70,12 +70,12 @@ Paper: [Zhao & Itti, 2016: Improved Deep Learning of Object Category using Pose 
 <br/>
 Paper: [Jayaraman & Grauman, 2015: Learning image representations equivariant to ego-motion](http://arxiv.org/pdf/1505.02206.pdf)
 
-4. If you know want your contextual data is much better for predicting the
+4. If you know want your side information is much better for predicting the
 target than the input data, you can apply the *direct pattern* to do a regression 
-of the input on the context, and then use the resulting representation to
+of the input on the side information, and then use the resulting representation to
 predict the targets.
 
-All examples are examples for supervised learning, but contextual learning
+All examples are examples for supervised learning, but learning with side information
 is equally applicable to reinforcement learning:
 [Jonschkowski & Brock, 2015: Learning state representations with robotic priors](http://www.robotics.tu-berlin.de/fileadmin/fg170/Publikationen_pdf/Jonschkowski-15-AURO.pdf)
 

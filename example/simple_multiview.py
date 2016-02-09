@@ -2,7 +2,7 @@
 
 """
 This example illustrates how simple it is to train a classifier using
-contextual data.
+side information.
 
 It illustrates the exemplary use of the multi-view pattern; for more info
 on how to use other patterns, check out synthetic.py.
@@ -27,7 +27,7 @@ try:
 except:
     print (
 """You don't have scikit-learn installed; install it to compare
-contextual learning to simple supervised learning""")
+learning with side information to simple supervised learning""")
     sklm = None
 
 import numpy as np
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     num_samples = 300
     
     input_dim = 50
-    context_dim = 50
+    side_dim = 50
     
     # generate some random data with 100 samples and 5 dimensions
     X = np.random.randn(num_samples, input_dim)
@@ -58,9 +58,9 @@ if __name__ == "__main__":
     # the pattern
     num_classes = 2
     
-    # Now let's define some context: we simulate an additional sensor
+    # Now let's define some side information: we simulate an additional sensor
     # which contains S, but embedded into a different space
-    C = np.random.randn(num_samples, context_dim)
+    C = np.random.randn(num_samples, side_dim)
     # set second dimension of C to correspond to S
     C[:, 1] = S[:,0]
     
@@ -69,13 +69,13 @@ if __name__ == "__main__":
     R = np.linalg.qr(np.random.randn(input_dim, input_dim))[0] # random linear rotation
     X = X.dot(R)
 
-    Q = np.linalg.qr(np.random.randn(context_dim, context_dim))[0] # random linear rotation
+    Q = np.linalg.qr(np.random.randn(side_dim, side_dim))[0] # random linear rotation
     C = C.dot(Q)
    
     #--------------------------------------------------------
     # Define the pattern
     
-    # now that we have some data, we can use a contextual pattern to learn
+    # now that we have some data, we can use a pattern to learn
     # from it. 
     # since X and C are two different "views" of the relevant data S,
     # the multi-view pattern is the most natural choice.
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     # Let's first define the theano variables which will represent our data
     input_var = T.matrix('inputs')  # for X
     target_var = T.ivector('targets')  # for Y
-    context_var = T.matrix('contexts')  # for C
+    side_var = T.matrix('sideinfo')  # for C
     
     # Size of the intermediate representation phi(X); since S is 1-dim,
     # phi(X) can also map to a 1-dim vector
@@ -137,17 +137,17 @@ if __name__ == "__main__":
                                                  # build the functions and the losses
                                                  input_var=input_var, 
                                                  target_var=target_var, 
-                                                 context_var=context_var,
+                                                 side_var=side_var,
                                                  input_shape=input_dim,
                                                  target_shape=num_classes,
-                                                 context_shape=context_dim,
+                                                 side_shape=side_dim,
                                                  representation_shape=representation_dim,
                                                  # we have to define two loss functions: 
                                                  # the target loss deals with optimizing psi and phi wrt. X & Y
                                                  target_loss=lasagne.objectives.categorical_crossentropy,
-                                                 # the context loss deals with optimizing beta and phi wrt. X & C,
+                                                 # the side loss deals with optimizing beta and phi wrt. X & C,
                                                  # for multi-view it is beta(C)~phi(X)
-                                                 context_loss=lasagne.objectives.squared_error)
+                                                 side_loss=lasagne.objectives.squared_error)
 
     #--------------------------------------------------------
     # Training 
@@ -178,7 +178,7 @@ if __name__ == "__main__":
    
     # we use the fit_XYC method because our X, Y and C data all have the same
     # size. Also note the [] our C_train - because it is possible to pass
-    # multiple contexts to some patterns, you have to pass context data
+    # multiple side information to some patterns, you have to pass side information
     # in a list.
     # We can also pass validation data to the fit method, however it only
     # has an effect if we set the verbose switch to true to give us

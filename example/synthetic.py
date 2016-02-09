@@ -78,14 +78,14 @@ def load_dataset(tr_data, tr_data_url, test_data, test_data_url):
     return (npz_train, npz_test),\
       (X, Y, C, X_valid, Y_valid, X_test, Y_test)
     
-def load_direct_context_dataset():
+def load_direct_side_dataset():
     tr_data = "cl_synth_direct_d-50_e-0_n-500_seed-12340.npz"
     tr_data_url = "https://owncloud.tu-berlin.de/index.php/s/QBoweGppuFbW7CB/download"
     test_data = "cl_synth_direct_d-50_e-0_ntest-50000_seed-12340.npz"
     test_data_url = "https://owncloud.tu-berlin.de/index.php/s/QD03NhenHFhZFdT/download"
     return load_dataset(tr_data, tr_data_url, test_data, test_data_url)[1]
 
-def load_embedding_context_dataset():
+def load_embedding_side_dataset():
     tr_data = "cl_synth_embedding_d-50_e-25_n-500_seed-12340.npz"
     tr_data_url = "https://owncloud.tu-berlin.de/index.php/s/3YYrcGP0pKHPDvI/download"
     test_data = "cl_synth_embedding_d-50_e-25_ntest-50000_seed-12340.npz"
@@ -99,7 +99,7 @@ def load_embedding_context_dataset():
       
     return res
 
-def load_relative_context_dataset():
+def load_relative_side_dataset():
     tr_data = "cl_synth_relative_d-50_e-0_n-500_seed-12340.npz"
     tr_data_url = "https://owncloud.tu-berlin.de/index.php/s/D5Wi67IDtbeMXG2/download"
     test_data = "cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz"
@@ -108,7 +108,7 @@ def load_relative_context_dataset():
     (_,_), (X, Y, C, X_valid, Y_valid, X_test, Y_test) \
        = load_dataset(tr_data, tr_data_url, test_data, test_data_url)
     
-    # the context training data C contains stacked "x_j" and "y_ij" 
+    # the side training data C contains stacked "x_j" and "y_ij" 
     # which are aligned with the x_i in matrix X
     CX = C[:, :X.shape[1]]
     CY = C[:, X.shape[1]:]
@@ -122,7 +122,7 @@ def build_linear_simple(input_layer, n_out, nonlinearity=None, name=None):
     return network    
 
 #  ########################## Build Direct Pattern ###############################
-def build_direct_pattern(input_var, target_var, context_var, n, m, num_classes):
+def build_direct_pattern(input_var, target_var, side_var, n, m, num_classes):
     
     # Alternative 1: defining by explicitly building the functions:    
 #    input_layer = lasagne.layers.InputLayer(shape=(None, n),
@@ -133,9 +133,9 @@ def build_direct_pattern(input_var, target_var, context_var, n, m, num_classes):
 #        
 #    dp = concarne.patterns.DirectPattern(phi=phi, psi=psi, 
 #                                         target_var=target_var, 
-#                                         context_var=context_var,
+#                                         side_var=side_var,
 #                                         target_loss=lasagne.objectives.categorical_crossentropy,
-#                                         context_loss=lasagne.objectives.squared_error
+#                                         side_loss=lasagne.objectives.squared_error
 #                                         )
 
     # Alternative 2: defining by lists - this frees you from thinking
@@ -153,18 +153,18 @@ def build_direct_pattern(input_var, target_var, context_var, n, m, num_classes):
     dp = concarne.patterns.DirectPattern(phi=phi, psi=psi, 
                                          input_var=input_var, 
                                          target_var=target_var, 
-                                         context_var=context_var,
+                                         side_var=side_var,
                                          input_shape=n, 
                                          target_shape=num_classes, 
-                                         context_shape=m,
+                                         side_shape=m,
                                          representation_shape=m,
                                          target_loss=lasagne.objectives.categorical_crossentropy,
-                                         context_loss=lasagne.objectives.squared_error
+                                         side_loss=lasagne.objectives.squared_error
                                          )                                         
     return dp
 
 #  ########################## Build Multi-task Pattern ###############################
-def build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_classes):
+def build_multitask_pattern(input_var, target_var, side_var, n, m, d, num_classes):
     # Alternative 1: explicit
 #    input_layer = lasagne.layers.InputLayer(shape=(None, n),
 #                                        input_var=input_var)
@@ -176,8 +176,8 @@ def build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_cla
 #        
 #    mtp = concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta,
 #                                         target_var=target_var, 
-#                                         context_var=context_var,
-#                                         context_loss=lasagne.objectives.squared_error,
+#                                         side_var=side_var,
+#                                         side_loss=lasagne.objectives.squared_error,
 #                                         )
                                          
     # Alternative 2
@@ -196,32 +196,32 @@ def build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_cla
     mtp = concarne.patterns.MultiTaskPattern(phi=phi, psi=psi, beta=beta,
                                          input_var=input_var, 
                                          target_var=target_var, 
-                                         context_var=context_var,
+                                         side_var=side_var,
                                          input_shape=n, 
                                          target_shape=num_classes, 
-                                         context_shape=m,
+                                         side_shape=m,
                                          representation_shape=d,
                                          target_loss=lasagne.objectives.categorical_crossentropy,
-                                         context_loss=lasagne.objectives.squared_error
+                                         side_loss=lasagne.objectives.squared_error
                                          )    
     return mtp
     
 #  ########################## Build Multi-view Pattern ###############################
-def build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_classes):
+def build_multiview_pattern(input_var, target_var, side_var, n, m, d, num_classes):
     # Alternative 1: explicit
 #    input_layer = lasagne.layers.InputLayer(shape=(None, n),
 #                                        input_var=input_var)
-#    context_input_layer = lasagne.layers.InputLayer(shape=(None, m),
-#                                        input_var=context_var)
+#    side_input_layer = lasagne.layers.InputLayer(shape=(None, m),
+#                                        input_var=side_var)
 #    phi = build_linear_simple( input_layer, d, name="phi")
 #    psi = build_linear_simple( phi, num_classes, 
 #        nonlinearity=lasagne.nonlinearities.softmax, name="psi")
-#    beta = build_linear_simple( context_input_layer, d, name="beta")
+#    beta = build_linear_simple( side_input_layer, d, name="beta")
 #        
 #    mtp = concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta,
 #                                         target_var=target_var, 
-#                                         context_var=context_var,
-#                                         context_loss=lasagne.objectives.squared_error,
+#                                         side_var=side_var,
+#                                         side_loss=lasagne.objectives.squared_error,
 #                                         )
 
     # Alternative 2
@@ -240,20 +240,20 @@ def build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_cla
     mtp = concarne.patterns.MultiViewPattern(phi=phi, psi=psi, beta=beta,
                                          input_var=input_var, 
                                          target_var=target_var, 
-                                         context_var=context_var,
+                                         side_var=side_var,
                                          input_shape=n, 
                                          target_shape=num_classes, 
-                                         context_shape=m,
+                                         side_shape=m,
                                          representation_shape=d,
                                          target_loss=lasagne.objectives.categorical_crossentropy,
-                                         context_loss=lasagne.objectives.squared_error
+                                         side_loss=lasagne.objectives.squared_error
                                          )    
                                          
     return mtp    
     
 #  ########################## Build Pairwise Pattern ###############################
 
-def build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m, num_classes):
+def build_pw_transformation_pattern(input_var, target_var, side_var, side_transform_var, n, m, num_classes):
     # Alternative 1
 #    input_layer = lasagne.layers.InputLayer(shape=(None, n),
 #                                        input_var=input_var)
@@ -272,8 +272,8 @@ def build_pw_transformation_pattern(input_var, target_var, context_var, context_
 #    pptp = concarne.patterns.PairwisePredictTransformationPattern(phi=phi, psi=psi, 
 #                                         beta=beta,
 #                                         target_var=target_var, 
-#                                         context_var=context_var,
-#                                         context_transform_var=context_transform_var,
+#                                         side_var=side_var,
+#                                         side_transform_var=side_transform_var,
 #                                         )
 
     # Alternative 2
@@ -293,14 +293,14 @@ def build_pw_transformation_pattern(input_var, target_var, context_var, context_
     pptp = concarne.patterns.PairwisePredictTransformationPattern(phi=phi, psi=psi, beta=beta,
                                          input_var=input_var, 
                                          target_var=target_var, 
-                                         context_var=context_var,
-                                         context_transform_var=context_transform_var,
+                                         side_var=side_var,
+                                         side_transform_var=side_transform_var,
                                          input_shape=n, 
                                          target_shape=num_classes, 
-                                         context_shape=m,
+                                         side_shape=m,
                                          representation_shape=m,
                                          target_loss=lasagne.objectives.categorical_crossentropy,
-                                         context_loss=lasagne.objectives.squared_error
+                                         side_loss=lasagne.objectives.squared_error
                                          )    
                                          
     return pptp
@@ -329,7 +329,7 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
     # Prepare Theano variables for inputs and targets
     input_var = T.matrix('inputs')
     target_var = T.ivector('targets')
-    context_var = T.matrix('contexts')
+    side_var = T.matrix('sideinfo')
     
     # number of classes in example
     num_classes = 2
@@ -341,11 +341,11 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
     # Load data and build pattern
     if data == "direct":
         print("Loading direct data...")
-        X_train, y_train, C_train, X_val, y_val, X_test, y_test = load_direct_context_dataset()
+        X_train, y_train, C_train, X_val, y_val, X_test, y_test = load_direct_side_dataset()
     
     if data == "embedding":    
         print("Loading embedding data...")
-        X_train, y_train, C_train, X_val, y_val, X_test, y_test = load_embedding_context_dataset()
+        X_train, y_train, C_train, X_val, y_val, X_test, y_test = load_embedding_side_dataset()
     
     if data == "direct" or data == "embedding":
         # input dimension of X
@@ -357,48 +357,48 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
         
         if pattern_type == "direct":
           # d == m
-          pattern = build_direct_pattern(input_var, target_var, context_var, n, m, num_classes)
+          pattern = build_direct_pattern(input_var, target_var, side_var, n, m, num_classes)
           learning_rate=0.0001
           if procedure != "simultaneous":
             learning_rate*=0.1
-          loss_weights = {} #'target_weight':0.5, 'context_weight':0.5}
+          loss_weights = {} #'target_weight':0.5, 'side_weight':0.5}
 
         elif pattern_type == "multitask":
-          pattern = build_multitask_pattern(input_var, target_var, context_var, n, m, d, num_classes)
+          pattern = build_multitask_pattern(input_var, target_var, side_var, n, m, d, num_classes)
           learning_rate=0.0001
           if procedure != "simultaneous":
             learning_rate*=0.1
-          loss_weights = {'target_weight':0.9, 'context_weight':0.1}
+          loss_weights = {'target_weight':0.9, 'side_weight':0.1}
 
         elif pattern_type == "multiview":
-          pattern = build_multiview_pattern(input_var, target_var, context_var, n, m, d, num_classes)
+          pattern = build_multiview_pattern(input_var, target_var, side_var, n, m, d, num_classes)
           learning_rate=0.001
           if procedure != "simultaneous":
             learning_rate*=0.01
-          loss_weights = {'target_weight':0.99, 'context_weight':0.01}
+          loss_weights = {'target_weight':0.99, 'side_weight':0.01}
           
-        iterate_context_minibatches_args = [X_train, y_train, [C_train]]
+        iterate_side_minibatches_args = [X_train, y_train, [C_train]]
     
         
     elif data == "relative":
         # Load the dataset
         print("Loading relative data...")
-        X_train, y_train, CX_train, Cy_train, X_val, y_val, X_test, y_test = load_relative_context_dataset()
+        X_train, y_train, CX_train, Cy_train, X_val, y_val, X_test, y_test = load_relative_side_dataset()
 
-        context_transform_var = T.matrix('context_transforms')
+        side_transform_var = T.matrix('side_transforms')
     
         # input dimension of X
         n = X_train.shape[1]
         # intermediate dimension of C
         m = Cy_train.shape[1]
 
-        pattern = build_pw_transformation_pattern(input_var, target_var, context_var, context_transform_var, n, m, num_classes)
+        pattern = build_pw_transformation_pattern(input_var, target_var, side_var, side_transform_var, n, m, num_classes)
 
-        iterate_context_minibatches_args = [X_train, y_train, [CX_train, Cy_train]]
-        #train_fn_inputs = [input_var, target_var, context_var, context_transform_var]
+        iterate_side_minibatches_args = [X_train, y_train, [CX_train, Cy_train]]
+        #train_fn_inputs = [input_var, target_var, side_var, side_transform_var]
         
         learning_rate=0.0001        
-        loss_weights = {'target_weight':0.1, 'context_weight':0.9}
+        loss_weights = {'target_weight':0.1, 'side_weight':0.9}
     
     # ------------------------------------------------------
     # Get the loss expression for training
@@ -412,7 +412,7 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
                                                **loss_weights
                                                )
     print("Starting training...")
-    trainer.fit_XYC(*iterate_context_minibatches_args, 
+    trainer.fit_XYC(*iterate_side_minibatches_args, 
                     X_val=X_val, y_val=y_val,
                     verbose=True)
 
@@ -428,7 +428,7 @@ if __name__ == '__main__':
     parser.add_argument("pattern",  nargs='?', type=str, help="which pattern to use", 
                         default='direct', 
                         choices=['direct', 'multitask', 'multiview', 'pairwise'])
-    parser.add_argument("data",  nargs='?', type=str, help="which context data to load", 
+    parser.add_argument("data",  nargs='?', type=str, help="which side information data to load", 
                         default='direct', 
                         choices=['direct', 'embedding', 'relative'])
     parser.add_argument("procedure", nargs='?', type=str, help="training procedure", 
