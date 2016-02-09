@@ -7,7 +7,7 @@ concarne implements various patterns for learning with side information presente
 ### Quickstart
 
 - Check out concarne from the repository<br/>
-```git clone git@gitlab.tubit.tu-berlin.de:rbo-lab/concarne.git```
+```git clone https://github.com/tu-rbo/concarne.git```
 - Install concarne:<br/>
 ```python setup.py install```
 - Run the simple example <br/>
@@ -34,7 +34,7 @@ given input/output samples. Generalization to unseen samples requires making
 prior assumptions about this function. However, many priors assumptions cannot be defined 
 by only taking the function, its input, and its output into account. 
 
-We uses *side information* to define such priors. Side information are
+We use *side information* to define such priors. Side information are
 data that are neither from the input space nor from the output space of the function,
 but include useful information for learning it. Importantly, these 
 data *are not required during test time*, but only during training time.
