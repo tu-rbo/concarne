@@ -30,7 +30,7 @@ class Pattern(object):
     target_var : theano tensor variable
         Theano variable representing the target. Required for formulating the target loss.
     side_var: theano tensor variable
-        Theano variable representing the target.
+        Theano variable representing the side information.
         The semantics of this variable depend on the pattern.
         Note that additional side variables might be required by a pattern.
     target_loss: theano tensor variable, optional
