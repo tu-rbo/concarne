@@ -46,6 +46,14 @@ class PairwiseTransformationPattern(Pattern):
         return lasagne.objectives.squared_error
   
     def __init__(self, side_transform_var=None, side_transform_shape=None, **kwargs):
+        # we should have side_shape=input_shape
+        if 'side_shape' in kwargs:
+          if 'input_shape' in kwargs:
+            if kwargs['input_shape'] != kwargs['side_shape']:
+              raise Exception("side_shape should be omitted - it is required to have"
+                              " same value as input_shape in the pairwise patterns!")
+            kwargs['side_shape'] = kwargs['input_shape']
+        
         self.side_input_layer = None
         self.side_transform_shape = side_transform_shape
 
@@ -110,6 +118,13 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
     """
   
     def __init__(self, **kwargs):
+        if 'representation_shape' not in kwargs:
+            try:
+              kwargs['representation_shape'] = kwargs['side_shape']
+              print ("WARN: representation_shape not passed; assuming equals"
+                     " dimensionality of side information, i.e. side_shape")
+            except:
+              pass
         super(PairwisePredictTransformationPattern, self).__init__(**kwargs)
 
     @property  
@@ -117,9 +132,9 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
         if self.side_input_layer is None:
             # create input layer
             #print ("Creating input layer for beta")
-            side_dim = self.side_shape
-            if isinstance(self.side_shape, int):
-                side_dim = (None, self.side_shape)
+            side_dim = self.representation_shape
+            if isinstance(side_dim, int):
+                side_dim = (None, side_dim)
             self.side_input_layer = lasagne.layers.InputLayer(shape=side_dim,
                                         input_var=self.side_var)
         return self.side_input_layer

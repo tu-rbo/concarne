@@ -108,11 +108,18 @@ class Pattern(object):
         
         if beta is not None and isinstance(beta, list) or isinstance(beta, tuple):
             # if no input layer in list -> build it
-            self.beta = \
-                self._initialize_function('beta', beta, self.default_beta_input,
-                                          self.BETA_OUTPUT_SHAPE, 
-                                          self.default_beta_output_shape
-                                          )
+            try:
+              self.beta = \
+                  self._initialize_function('beta', beta, self.default_beta_input,
+                                            self.BETA_OUTPUT_SHAPE, 
+                                            self.default_beta_output_shape
+                                            )
+            except ValueError, e:
+              raise Exception("Could not resolve BETA_OUTPUT_SHAPE marker --"
+                     " is the value returned by self.default_beta_output_shape"
+                     " valid? (not None)\n"
+                     " Futher hints: " + str(e))
+              
 
         # tag the parameters of each function with the name of the function
         for fun, fun_name in zip([self.phi, self.psi, self.beta], ['phi', 'psi', 'beta']):
@@ -302,8 +309,6 @@ class Pattern(object):
         """Function to build phi, psi and beta automatically from a 
         nolearn style network-as-list description.
         
-        output_shape is currently unused (so you need to provide the right)
-        
         This method has been adapted from the NeuralFit class in nolearn.
         https://github.com/dnouri/nolearn/blob/master/nolearn/lasagne/base.py
         Copyright (c) 2012-2015 Daniel Nouri"""
@@ -441,7 +446,7 @@ class Pattern(object):
                 if v == output_shape_marker:
                     #print ("%s triggered -> %s" % (output_shape_marker, str(output_shape)))
                     if output_shape is None:
-                        raise Exception("Cannot automatically set output shape (is None)"
+                        raise ValueError("Cannot automatically set output shape (is None)"
                         " for %s - did you set all required shape variables" 
                         " in the constructor of the pattern?"
                         " (marker was: %s)" % (fun_name, output_shape_marker))
