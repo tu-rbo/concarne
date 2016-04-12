@@ -10,6 +10,7 @@ __all__ = [
 
 from .base import Pattern
 
+import theano.tensor as T
 import lasagne.objectives
 import lasagne.layers
 
@@ -34,7 +35,9 @@ class PairwiseTransformationPattern(Pattern):
 
     Parameters
     ----------
-    side_transform_var: a Theano variable representing the transformation.
+    side_transform_var: a Theano variable 
+      Variable representing the transformation.
+      This will usually be the classification / regression target of beta.
     """
   
     @property
@@ -114,10 +117,12 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
 
     Parameters
     ----------
-    side_transform_var: a Theano variable representing the transformation.
+    beta_input_mode: str
+      Determines the mode how ``beta'' gets its input:
+      ``diff'' means phi(x_i)-phi(x_j), ``stacked'' means [phi(x_i), phi(x_j)]
     """
   
-    def __init__(self, **kwargs):
+    def __init__(self, beta_input_mode="diff", **kwargs):
         if 'representation_shape' not in kwargs:
             try:
               kwargs['representation_shape'] = kwargs['side_shape']
@@ -125,7 +130,12 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
                      " dimensionality of side information, i.e. side_shape")
             except:
               pass
+
+        #assert (beta_input_mode in ['diff', 'distance','stacked'])
+        assert (beta_input_mode in ['diff', 'stacked'])
+        self.beta_input_mode = beta_input_mode
         super(PairwisePredictTransformationPattern, self).__init__(**kwargs)
+
 
     @property  
     def default_beta_input(self):
@@ -133,6 +143,14 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
             # create input layer
             #print ("Creating input layer for beta")
             side_dim = self.representation_shape
+            if self.beta_input_mode == "stacked":
+                # the input the beta is doubled if we stack the output of 
+                # phi applied to x and cx
+                side_dim *= 2
+            elif self.beta_input_mode == "stacked":
+                # the input the beta is doubled if we stack the output of 
+                # phi applied to x and cx
+                side_dim *= 2
             if isinstance(side_dim, int):
                 side_dim = (None, side_dim)
             self.side_input_layer = lasagne.layers.InputLayer(shape=side_dim,
@@ -146,8 +164,15 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
     def get_beta_output_for(self, input_i, input_j, **kwargs):
         phi_i_output = self.phi.get_output_for(input_i, **kwargs)
         phi_j_output = self.phi.get_output_for(input_j, **kwargs)
-        diff = phi_i_output-phi_j_output
+        beta_in = None
+        if self.beta_input_mode == "diff":
+            beta_in = phi_i_output-phi_j_output
+        #elif self.beta_input_mode == "distance":
+        #    beta_in = T.sqrt((phi_i_output-phi_j_output)**2
+        elif self.beta_input_mode == "stacked":
+            beta_in = T.concatenate([phi_i_output, phi_j_output], axis=1)
+            
         if self.beta is not None:
-            return self.beta.get_output_for(diff, **kwargs)
+            return self.beta.get_output_for(beta_in, **kwargs)
         else:
-            return diff
+            return beta_in

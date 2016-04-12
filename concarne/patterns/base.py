@@ -33,6 +33,15 @@ class Pattern(object):
         Theano variable representing the side information.
         The semantics of this variable depend on the pattern.
         Note that additional side variables might be required by a pattern.
+    input_shape : int or tuple
+        Shape of the input variable
+    target_shape : int or tuple
+        Shape of the target variable
+    side_shape : int or tuple
+        Shape of the side information variable
+    representation_shape : int or tuple
+        Shape of the intermediate representation to be learned
+        (for some patterns that may coincide with the side_shape)
     target_loss: theano tensor variable, optional
         Theano expression or lasagne objective for the optimizing the 
         target.
