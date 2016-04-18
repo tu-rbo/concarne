@@ -14,11 +14,11 @@ import lasagne.objectives
 class DirectPattern(Pattern):
     """
     The :class:`DirectPattern` is the simplest learning with side information pattern   
-    where c is used directly as the target representation s = phi(x)::
+    where s is used directly as the target representation z = phi(x)::
     
-     x ----> s -----> y
+     x ----> z -----> y
        phi   |  psi
-             c  
+             s  
 
     """
   

@@ -20,14 +20,14 @@ class PairwiseTransformationPattern(Pattern):
     is as follows::
     
                    psi
-      x_i ----> s_i ------> y
+      x_i ----> z_i ------> y
            phi      \\
                      \\
-      x_j ----> s_j -->  ~c
+      x_j ----> z_j -->  ~s
            phi       beta
 
     Note that self.side_var should represent x_j, whereas self.input_var 
-    represents self.x_i. The variable ``c'' in the picture is then represented
+    represents self.x_i. The variable ``s'' in the picture is then represented
     by side_transform_var.
     
     The subclass of this pattern decides what beta looks like.
@@ -107,14 +107,14 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
     (x_i, x_j)::
 
                    psi
-       x_i ----> s_i ------> y
+       x_i ----> z_i ------> y
             phi      \\
                       \\
-       x_j ----> s_j ------> ~c
-            phi       beta(s_i, s_j)
+       x_j ----> z_j ------> ~s
+            phi       beta(z_i, z_j)
 
     Note that self.side_var should represent x_j, whereas self.input_var 
-    represents self.x_i. The variable ``c'' in the picture is then represented
+    represents self.x_i. The variable ``s'' in the picture is then represented
     by side_transform_var.
     
 
@@ -122,7 +122,7 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
     ----------
     beta_input_mode: str
       Determines the mode how ``beta'' gets its input:
-      ``diff'' means phi(x_i)-phi(x_j), ``stacked'' means [phi(x_i), phi(x_j)]
+      ``diff'' means [phi(x_i),-phi(x_j)], ``stacked'' means [phi(x_i), phi(x_j)]
     """
   
     def __init__(self, beta_input_mode="diff", **kwargs):

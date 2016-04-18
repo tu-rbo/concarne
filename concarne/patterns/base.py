@@ -567,6 +567,10 @@ class Pattern(object):
         params += lasagne.layers.get_all_params(self.phi, **tags) 
         return params
         
+    def get_all_params(self, **tags):
+        """Alias for get_params"""
+        return self.get_params(**tags)
+        
     def get_output_shape_for(self, input_shape):
         """
         Computes the output shape of this layer, given an input shape.

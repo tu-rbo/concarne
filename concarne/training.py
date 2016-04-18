@@ -24,7 +24,7 @@ class PatternTrainer(object):
        
         > pt = concarne.training.PatternTrainer(pattern, 5, 0.0001, 50, 
                      target_weight=0.9, side_weight=0.1, verbose=True)
-        > pt.fit_XYC(X_train, y_train, C_train, X_val=X_val, y_val=y_val)
+        > pt.fit_XYS(X_train, y_train, C_train, X_val=X_val, y_val=y_val)
             Training procedure: simultaneous
              Optimize phi & psi & beta using a weighted sum of target and side objective
                -> standard mode with single training function
@@ -56,9 +56,9 @@ class PatternTrainer(object):
 
        If in your task, you have more (or simply a different amount of)
        side information available than labels, you can use the method 
-       fit_XC_XY::
+       fit_XS_XY:
        
-        > pt.fit_XC_XY(X_train, C_train, X_train2, y_train, X_val=X_val, y_val=y_val)
+        > pt.fit_XS_XY(X_train, C_train, X_train2, y_train, X_val=X_val, y_val=y_val)
         
        In the simultaneous procedure, instead of jointly optimizing the
        gradient for combined objective, we alternate the computation of the
@@ -183,7 +183,7 @@ class PatternTrainer(object):
 
         return val_fn
         
-    def fit_XYC(self, X, Y, Cs,
+    def fit_XYS(self, X, Y, Cs,
             batch_iterator=None, 
             X_val=None, y_val=None,
             verbose=False):
@@ -221,7 +221,7 @@ class PatternTrainer(object):
         return self._fit([batch_iterator]*2, [batch_iterator_args]*2, 
                          "XYC", X_val, y_val, verbose)
         
-    def fit_XC_XY(self, X1, Cs, X2, Y,
+    def fit_XS_XY(self, X1, Cs, X2, Y,
             batch_iterator_XC=None,
             batch_iterator_XY=None, 
             X_val=None, y_val=None,

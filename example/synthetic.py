@@ -297,7 +297,6 @@ def build_pw_transformation_pattern(input_var, target_var, side_var, side_transf
                                          side_transform_var=side_transform_var,
                                          input_shape=n, 
                                          target_shape=num_classes, 
-                                         side_shape=m,
                                          representation_shape=m,
                                          target_loss=lasagne.objectives.categorical_crossentropy,
                                          side_loss=lasagne.objectives.squared_error
@@ -412,7 +411,7 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
                                                **loss_weights
                                                )
     print("Starting training...")
-    trainer.fit_XYC(*iterate_side_minibatches_args, 
+    trainer.fit_XYS(*iterate_side_minibatches_args, 
                     X_val=X_val, y_val=y_val,
                     verbose=True)
 
