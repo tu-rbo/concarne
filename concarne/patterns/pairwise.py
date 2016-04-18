@@ -50,18 +50,21 @@ class PairwiseTransformationPattern(Pattern):
   
     def __init__(self, side_transform_var=None, side_transform_shape=None, **kwargs):
         # we should have side_shape=input_shape
-        if 'side_shape' in kwargs:
-          if 'input_shape' in kwargs:
+        if 'input_shape' in kwargs:
+          if 'side_shape' in kwargs:
             if kwargs['input_shape'] != kwargs['side_shape']:
               raise Exception("side_shape should be omitted - it is required to have"
                               " same value as input_shape in the pairwise patterns!")
-            kwargs['side_shape'] = kwargs['input_shape']
         
-        self.side_input_layer = None
+          kwargs['side_shape'] = kwargs['input_shape']
+        
         self.side_transform_shape = side_transform_shape
 
         self.side_transform_var = side_transform_var
         assert (self.side_transform_var is not None)
+
+        # layer collecting the phi outputs, connecting them and passing them to beta
+        self.side_connect_layer = None
 
         super(PairwiseTransformationPattern, self).__init__(**kwargs)
 
@@ -139,40 +142,36 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
 
     @property  
     def default_beta_input(self):
-        if self.side_input_layer is None:
-            # create input layer
-            #print ("Creating input layer for beta")
-            side_dim = self.representation_shape
-            if self.beta_input_mode == "stacked":
-                # the input the beta is doubled if we stack the output of 
-                # phi applied to x and cx
-                side_dim *= 2
-            elif self.beta_input_mode == "stacked":
-                # the input the beta is doubled if we stack the output of 
-                # phi applied to x and cx
-                side_dim *= 2
-            if isinstance(side_dim, int):
-                side_dim = (None, side_dim)
-            self.side_input_layer = lasagne.layers.InputLayer(shape=side_dim,
-                                        input_var=self.side_var)
-        return self.side_input_layer
+        if self.side_connect_layer is None:
+          # create connection layer
+          if self.beta_input_mode == "diff":
+            self.side_connect_layer = lasagne.layers.ElemwiseSumLayer([self.phi, self.phi])
+          elif self.beta_input_mode == "stacked":
+            self.side_connect_layer = lasagne.layers.ConcatLayer([self.phi, self.phi])
+        return self.side_connect_layer
 
     @property  
     def default_beta_output_shape(self):
         return self.side_transform_shape
-
-    def get_beta_output_for(self, input_i, input_j, **kwargs):
-        phi_i_output = self.phi.get_output_for(input_i, **kwargs)
-        phi_j_output = self.phi.get_output_for(input_j, **kwargs)
-        beta_in = None
-        if self.beta_input_mode == "diff":
-            beta_in = phi_i_output-phi_j_output
-        #elif self.beta_input_mode == "distance":
-        #    beta_in = T.sqrt((phi_i_output-phi_j_output)**2
-        elif self.beta_input_mode == "stacked":
-            beta_in = T.concatenate([phi_i_output, phi_j_output], axis=1)
+        
+    def get_beta_output_for(self, input_i, input_j, **kwargs):        
+        phi_i_output = lasagne.layers.get_output(self.phi, input_i, **kwargs)
+        phi_j_output = lasagne.layers.get_output(self.phi, input_j, **kwargs)
+        
+        if self.beta is None:
+            if self.beta_input_mode == "diff":
+                return phi_i_output-phi_j_output
+            #elif self.beta_input_mode == "distance":
+            #    return T.sqrt((phi_i_output-phi_j_output)**2
+            elif self.beta_input_mode == "stacked":
+                return T.concatenate([phi_i_output, phi_j_output], axis=1)
             
-        if self.beta is not None:
-            return self.beta.get_output_for(beta_in, **kwargs)
         else:
-            return beta_in
+            # beta is a function
+            if self.beta_input_mode == "diff":
+                beta_in = [phi_i_output, -phi_j_output]
+            elif self.beta_input_mode == "stacked":
+                beta_in = [phi_i_output, phi_j_output]
+
+            return self.get_output_for_function(self.beta, beta_in, **kwargs)
+            

@@ -107,6 +107,7 @@ class Pattern(object):
             # extract input layer and variable from the given phi
             self.input_layer = lasagne.layers.get_all_layers(self.phi)[0]
             self.input_var = self.input_layer.input_var
+        self.phi._fun_name = "phi"
 
         if isinstance(psi, list) or isinstance(psi, tuple):
             # if no input layer in list -> build it
@@ -114,6 +115,7 @@ class Pattern(object):
                 self._initialize_function('psi', psi, self.default_psi_input,
                                           self.PSI_OUTPUT_SHAPE,
                                           self.target_shape)
+            self.psi._fun_name = "psi"
         
         if beta is not None and isinstance(beta, list) or isinstance(beta, tuple):
             # if no input layer in list -> build it
@@ -123,8 +125,9 @@ class Pattern(object):
                                             self.BETA_OUTPUT_SHAPE, 
                                             self.default_beta_output_shape
                                             )
+              self.beta._fun_name = "beta"
             except ValueError, e:
-              raise Exception("Could not resolve BETA_OUTPUT_SHAPE marker --"
+              raise Exception("Could not replace BETA_OUTPUT_SHAPE marker --"
                      " is the value returned by self.default_beta_output_shape"
                      " valid? (not None)\n"
                      " Futher hints: " + str(e))
@@ -271,7 +274,17 @@ class Pattern(object):
         """
         raise NotImplemented()
                                        
-    
+
+    def _get_all_function_layers(self, fun_name):
+        """
+         Get only the layers that belong to a certain pattern.
+        """
+        layers = []
+        for l in lasagne.layers.get_all_layers(self.beta):
+          if l._pattern_function == fun_name:
+            layers.append(l)
+        return layers            
+            
     def _tag_function_parameters(self, fun, fun_name):
         """
         Helper function to add the tag `fun_name` (encoding the function name,
@@ -479,6 +492,8 @@ class Pattern(object):
             if layer_wrapper is not None:
                 layer = layer_wrapper(layer)
                 fun_["LW_%s" % layer_kw['name']] = layer
+                
+            layer._pattern_function = fun_name
 
         # we return the last layer as the representative of the function
         # as it's common in lasagne
@@ -600,6 +615,30 @@ class Pattern(object):
         if input is None:
             input = self.input_var
         return lasagne.layers.get_output(self.phi, inputs=input, **kwargs)
+
+    def get_output_for_function(self, fun_or_fun_name, input, **kwargs):
+        """
+         Get the output for a pattern subfunction (i.e. phi, psi, beta) by
+         setting the input to that subfunction manually.
+
+         The problem is that if you apply lasagne.layers.get_output to, e.g., 
+         psi, which gets phi as input, lasagne.layers.get_output will except
+         the 'input' to be the input of phi, not the input of psi.
+         
+         Sometimes, it is desirable to set the input of psi manually.
+         
+         Note, that this differs from the behavior of get_phi_output_for, 
+         get_psi_output_for and get_beta_output_for, which expect the initial
+         input to the network (depending on the pattern, often phi's input).
+
+        """
+        if type(fun_or_fun_name) != str:
+            fun_or_fun_name = fun_or_fun_name._fun_name
+        
+        last_input = input
+        for l in self._get_all_function_layers(fun_or_fun_name):
+            last_input = l.get_output_for(last_input, **kwargs)
+        return last_input    
 
     def training_loss(self, target_weight=0.5, side_weight=0.5):
         # we need to gate because if we set one weight to 0., we might

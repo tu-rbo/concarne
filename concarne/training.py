@@ -139,7 +139,7 @@ class PatternTrainer(object):
         
         params = lasagne.layers.get_all_params(self.pattern, trainable=True, **tags)
 
-            # TODO add possibility to use different update mechanism
+        # TODO add possibility to use different update mechanism
         updates = lasagne.updates.nesterov_momentum(
             loss, params, learning_rate=self.learning_rate, momentum=self.momentum)
     
