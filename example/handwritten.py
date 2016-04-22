@@ -265,7 +265,7 @@ def main(pattern, data_representation, procedure, num_epochs, batchsize):
                                                loss_weights['target_weight'],
                                                loss_weights['side_weight'])
     print("Starting training...")
-    trainer.fit_XS_XY(X_train, [C_train], X_sup, y_sup, X_val=X_test, y_val=y_test, verbose=True)
+    trainer.fit_XZ_XY(X_train, [C_train], X_sup, y_sup, X_val=X_test, y_val=y_test, verbose=True)
 
     print("=================")
     print("Test score...")

@@ -20,14 +20,14 @@ class PairwiseTransformationPattern(Pattern):
     is as follows::
     
                    psi
-      x_i ----> z_i ------> y
+      x_i ----> s_i ------> y
            phi      \\
                      \\
-      x_j ----> z_j -->  ~s
+      x_j ----> s_j -->  ~z
            phi       beta
 
     Note that self.side_var should represent x_j, whereas self.input_var 
-    represents self.x_i. The variable ``s'' in the picture is then represented
+    represents self.x_i. The variable ``z'' in the picture is then represented
     by side_transform_var.
     
     The subclass of this pattern decides what beta looks like.
@@ -102,19 +102,19 @@ class PairwiseTransformationPattern(Pattern):
 class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
     """
     The :class:`PairwisePredictTransformationPattern` is a pattern where 
-    c is used as given information about the transformation between pairs
-    of input pairs. The function beta is then used to predict c from a pair
+    z is used as given information about the transformation between pairs
+    of input pairs. The function beta is then used to predict z from a pair
     (x_i, x_j)::
 
                    psi
-       x_i ----> z_i ------> y
+       x_i ----> s_i ------> y
             phi      \\
                       \\
-       x_j ----> z_j ------> ~s
-            phi       beta(z_i, z_j)
+       x_j ----> s_j ------> ~z
+            phi       beta(s_i, s_j)
 
     Note that self.side_var should represent x_j, whereas self.input_var 
-    represents self.x_i. The variable ``s'' in the picture is then represented
+    represents self.x_i. The variable ``z'' in the picture is then represented
     by side_transform_var.
     
 

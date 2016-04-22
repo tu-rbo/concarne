@@ -13,15 +13,15 @@ import lasagne.objectives
 
 class MultiTaskPattern(Pattern):
     """
-    The :class:`MultiTaskPattern` uses additional labels s for
-    learning beta(phi(x)) -> s::
+    The :class:`MultiTaskPattern` uses additional labels z for
+    learning beta(phi(x)) -> z::
     
                 psi
-      x ----> z -----> y
+      x ----> s -----> y
         phi    \\  
-                \\ beta(z)
+                \\ beta(s)
                  \\
-                ---> s
+                ---> z
     """
   
     @property

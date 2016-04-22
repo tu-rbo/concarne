@@ -183,7 +183,7 @@ if __name__ == "__main__":
     # We can also pass validation data to the fit method, however it only
     # has an effect if we set the verbose switch to true to give us
     # information about the learning progress
-    trainer.fit_XYC(X_train, y_train, [C_train], 
+    trainer.fit_XYZ(X_train, y_train, [C_train], 
                     X_val=X_val, y_val=y_val, 
                     verbose=True)
 

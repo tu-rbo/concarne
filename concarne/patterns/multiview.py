@@ -13,15 +13,15 @@ import lasagne.objectives
 
 class MultiViewPattern(Pattern):
     """
-    The :class:`MultiViewPattern` is uses additional input (modality) s for
-    learning beta(s) -> z', such that z' ~ z, with z=phi(x)::
+    The :class:`MultiViewPattern` is uses additional input (modality) z for
+    learning beta(z) -> s', such that s' ~ s, with s=phi(x)::
     
                 psi
-      x ----> z -----> y
+      x ----> s -----> y
         phi  /  
             / beta(s)
            /
-      s ---
+      z ---
        
     """ 
   

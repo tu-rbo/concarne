@@ -411,7 +411,7 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
                                                **loss_weights
                                                )
     print("Starting training...")
-    trainer.fit_XYS(*iterate_side_minibatches_args, 
+    trainer.fit_XYZ(*iterate_side_minibatches_args, 
                     X_val=X_val, y_val=y_val,
                     verbose=True)
 
