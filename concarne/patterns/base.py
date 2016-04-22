@@ -7,9 +7,15 @@ from lasagne.layers import get_all_layers
 from lasagne.layers import InputLayer
 from lasagne.layers import Layer
 
+import numpy as np
+
 import itertools
 from collections import OrderedDict
 import inspect
+
+import copy
+import os
+import tarfile
 
 class Pattern(object):
     """
@@ -655,3 +661,80 @@ class Pattern(object):
             loss += side_weight * self.side_loss
             
         return loss
+
+    def save(self, fn):
+        """
+        Save your pattern's weights in a tar file containing npz files.
+        You can then use `load` to recreate the pattern from this file.
+
+        Parameters
+        ----------
+        fn : str
+            file name
+        """
+        # tar to one file
+        tmp_files = []
+        with tarfile.open(fn + ".tar", mode='w') as out:
+            # use lasagne style parameter storage to avoid CUDA vs. non-CUDA
+            # theano issue 
+            phi_pval = lasagne.layers.get_all_param_values(self.phi)
+            phi_fn = fn+"_phi.npz"
+            np.savez(phi_fn, *phi_pval)
+            out.add (phi_fn)
+            tmp_files.append(phi_fn)
+        
+            psi_pval = lasagne.layers.get_all_param_values(self.psi)
+            psi_fn = fn+"_psi.npz"
+            np.savez(psi_fn, *psi_pval)
+            out.add (psi_fn)
+            tmp_files.append(psi_fn)
+
+            if self.beta is not None:
+                beta_pval = lasagne.layers.get_all_param_values(self.beta)
+                beta_fn = fn+"_beta.npz"
+                np.savez(beta_fn, *beta_pval)
+                out.add (beta_fn)
+                tmp_files.append(beta_fn)
+    
+        for d in tmp_files:
+            try:
+                os.unlink(d)
+            except:
+                pass
+                
+    def load(self, fn):
+        """
+        Assuming you have initialized the pattern exactly as it
+        was pickled in the file 'fn', you can restore all function
+        parameters using this function.
+
+        Parameters
+        ----------
+        fn : str
+            file name
+        """
+        
+        fn_split = os.path.splitext(fn)
+        
+        assert (fn_split[-1] == ".tar")
+        fun_names = ['phi', 'psi', 'beta']
+        npz_files_loaded = {}
+        
+        with tarfile.open(fn, mode='r') as t:
+            for m in t.getmembers():
+                for fun_name in fun_names:
+                    if fun_name in m.name:
+                        #print ("extracting" + str(m))
+                        t.extract(m)
+                        npz_files_loaded[fun_name] = m.name
+
+        for fun_name, fun_npz in npz_files_loaded.items():
+            with np.load(fun_npz) as f:
+                param_values = [f['arr_%d' % i] for i in range(len(f.files))]
+                lasagne.layers.set_all_param_values(self.__dict__[fun_name], param_values)
+
+        for _,d in npz_files_loaded.items():
+            try:
+                os.unlink(d)
+            except:
+                pass
