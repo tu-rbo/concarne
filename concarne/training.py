@@ -9,6 +9,7 @@ import lasagne
 import theano
 import theano.tensor as T
 
+import datetime
 import time
 import copy
 
@@ -20,11 +21,11 @@ class PatternTrainer(object):
        It is similar to :class:`lasagne.layers.Layer` and mimics some of 
        its functionality, but does not inherit from it.
        
-       Example with aligned data X_train, y_train and C_train::
+       Example with aligned data X_train, y_train and Z_train::
        
         > pt = concarne.training.PatternTrainer(pattern, 5, 0.0001, 50, 
                      target_weight=0.9, side_weight=0.1, verbose=True)
-        > pt.fit_XYZ(X_train, y_train, C_train, X_val=X_val, y_val=y_val)
+        > pt.fit_XYZ(X_train, y_train, Z_train, X_val=X_val, y_val=y_val)
             Training procedure: simultaneous
              Optimize phi & psi & beta using a weighted sum of target and side objective
                -> standard mode with single training function
@@ -58,7 +59,7 @@ class PatternTrainer(object):
        side information available than labels, you can use the method 
        fit_XZ_XY:
        
-        > pt.fit_XZ_XY(X_train, C_train, X_train2, y_train, X_val=X_val, y_val=y_val)
+        > pt.fit_XZ_XY(X_train, Z_train, X_train2, y_train, X_val=X_val, y_val=y_val)
         
        In the simultaneous procedure, instead of jointly optimizing the
        gradient for combined objective, we alternate the computation of the
@@ -98,6 +99,11 @@ class PatternTrainer(object):
             integer.
         verbose: bool, deprecated
             Use the verbose flags in fit_*** and score instead
+        save_params: bool
+            If true the parameters of the function will be stored.
+            This is particularly interesting for the decoupled and pre-train-fine-tune
+            procedures, as it allows to inspect intermediate results.
+            The file format is 'pt_<timestamp>.tar'.
         """
     def __init__(self, pattern, 
                  num_epochs, 
@@ -108,7 +114,8 @@ class PatternTrainer(object):
                  target_weight=None, 
                  side_weight=None,
                  test_objective=lasagne.objectives.categorical_crossentropy,
-                 verbose=None):
+                 verbose=None,
+                 save_params=False):
         self.pattern = pattern
         self.num_epochs = num_epochs
         self.batch_size = batch_size
@@ -133,6 +140,11 @@ class PatternTrainer(object):
         if verbose is not None:
             print ("WARN: passing verbose to constructor of PatternTrainer is deprecated."+
                 " Use verbose flags for fit*** and score methods instead." )
+                
+        self.save_params = save_params
+        if self.save_params:
+            ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+            self._dump_filename = "pt_%s" % ts
 
     def _compile_train_fn(self, train_fn_inputs, loss_weights, tags):
         loss = self.pattern.training_loss(**loss_weights).mean()
@@ -183,12 +195,12 @@ class PatternTrainer(object):
 
         return val_fn
         
-    def fit_XYZ(self, X, Y, Cs,
+    def fit_XYZ(self, X, Y, Zs,
             batch_iterator=None, 
             X_val=None, y_val=None,
             verbose=False):
         """Training function for aligned data (same number of examples for
-       X, Y and C)
+       X, Y and Z)
 
        Parameters
        ----------       
@@ -196,37 +208,37 @@ class PatternTrainer(object):
             Input data (rows: samples, cols: features)
         Y :  numpy array
             Labels / target data
-        Cs:  list of numpy arrays/lists
+        Zs:  list of numpy arrays/lists
             Side information - even if the pattern / iterator only expects the
             value for one side variable, you MUST give a list here
         batch_iterator: iterator, optional
-            Your custom iterator class that accepts X,Y,C1,..Cn as inputs
+            Your custom iterator class that accepts X,Y,Z1,..Zn as inputs
         X_val: numpy array, optional
             Validation input data
         y_val: numpy array, optional
             Validation labeled data
         """
 
-        if not isiterable(Cs):
+        if not isiterable(Zs):
             raise Exception("Make sure that you provide a list of side "
-                + " information Cs, even if the pattern only expects one side variable")
+                + " information Zs, even if the pattern only expects one side variable")
 
         if batch_iterator is None:
             batch_iterator = AlignedBatchIterator(self.batch_size, shuffle=True)
 
-        batch_iterator_args = [X, Y] + Cs
+        batch_iterator_args = [X, Y] + Zs
         if not all_elements_equal_len(batch_iterator_args):
-            raise Exception("X, Y and C must have same len!")
+            raise Exception("X, Y and Z must have same len!")
 
         return self._fit([batch_iterator]*2, [batch_iterator_args]*2, 
-                         "XYC", X_val, y_val, verbose)
+                         "XYZ", X_val, y_val, verbose)
         
-    def fit_XZ_XY(self, X1, Cs, X2, Y,
-            batch_iterator_XC=None,
+    def fit_XZ_XY(self, X1, Zs, X2, Y,
+            batch_iterator_XZ=None,
             batch_iterator_XY=None, 
             X_val=None, y_val=None,
             verbose=False):
-        """Training function for unaligned data (one data set for X and C,
+        """Training function for unaligned data (one data set for X and Z,
            another data set for X and Y)
 
        Parameters
@@ -234,7 +246,7 @@ class PatternTrainer(object):
         X1 :  numpy array
             Input data use for optimizing side objective 
             (rows: samples, cols: features)
-        Cs:  list of numpy arrays/lists
+        Zs:  list of numpy arrays/lists
             Side information - even if the pattern / iterator only expects the
             value for one side variable, you MUST give a list here
         X1 :  numpy array
@@ -244,40 +256,41 @@ class PatternTrainer(object):
             Labels / target data (per default each array should have same len as X1)
         batch_iterator_XY: iterator, optional
             Your custom iterator for going through the X-Y data
-        batch_iterator_XC: iterator, optional
-            Your custom iterator for going through the X-C data
+        batch_iterator_XZ: iterator, optional
+            Your custom iterator for going through the X-Z data
         X_val: numpy array, optional
             Validation input data
         y_val: numpy array, optional
             Validation labeled data
         """
         
-        if not isiterable(Cs):
+        if not isiterable(Zs):
             raise Exception("Make sure that you provide a list of side "
-                + " information Cs, even if the pattern only expects one side variable")
+                + " information Zs, even if the pattern only expects one side variable")
 
         if batch_iterator_XY is None:
             batch_iterator_XY = AlignedBatchIterator(self.batch_size, shuffle=True)
-        if batch_iterator_XC is None:
-            batch_iterator_XC = AlignedBatchIterator(self.batch_size, shuffle=True)
+        if batch_iterator_XZ is None:
+            batch_iterator_XZ = AlignedBatchIterator(self.batch_size, shuffle=True)
 
         batch_iterators = [
-            batch_iterator_XC,
+            batch_iterator_XZ,
             batch_iterator_XY
         ]
 
-        batch_iterator_args_lst = [ [X1] + Cs, [X2, Y] ]
+        batch_iterator_args_lst = [ [X1] + Zs, [X2, Y] ]
         if not all_elements_equal_len(batch_iterator_args_lst[0]):
-            raise Exception("X1 and all entries in Cs must have same len!")
+            raise Exception("X1 and all entries in Zs must have same len!")
         if not all_elements_equal_len(batch_iterator_args_lst[1]):
             raise Exception("X2 and Y must have same len!")
             
         return self._fit(batch_iterators, batch_iterator_args_lst, 
-                         "XC_XY", X_val, y_val, verbose)
+                         "XZ_XY", X_val, y_val, verbose)
         
-    def _fit(self, batch_iterators, batch_iterator_args_lst, data_alignment="XYC", X_val=None, y_val=None, verbose=False):
+    def _fit(self, batch_iterators, batch_iterator_args_lst, data_alignment="XYZ", 
+                X_val=None, y_val=None, verbose=False,):
 
-        assert (data_alignment in ["XYC", "XC_XY"])
+        assert (data_alignment in ["XYZ", "XZ_XY"])
 
         if X_val is not None and y_val is not None:
             assert (len(X_val) == len(y_val))
@@ -289,9 +302,9 @@ class PatternTrainer(object):
         # default: only one phase, with all vars as inputs for train_fn
         train_vars_phase1 = self.pattern.training_input_vars
         train_vars_phase2 = train_vars_phase1
-        if data_alignment == "XC_XY":
-            # alternating: two train_fn, one accepting X,C, two accepting X,Y
-            train_vars_phase1 = [self.pattern.input_var] + list(self.pattern.side_vars) # XC
+        if data_alignment == "XZ_XY":
+            # alternating: two train_fn, one accepting X,Z, two accepting X,Y
+            train_vars_phase1 = [self.pattern.input_var] + list(self.pattern.side_vars) # XZ
             train_vars_phase2 = [self.pattern.input_var, self.pattern.target_var] # XY
 
         # ========================================================
@@ -306,6 +319,12 @@ class PatternTrainer(object):
                                               tags= {'psi': False}, )
             # passing X_val and y_val doesn't make sense because psi is not trained
             self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]], verbose=verbose)
+            
+            if self.save_params:
+                df = self._dump_filename + "_" + self.procedure + "_phase1"
+                if verbose:
+                    print ("Storing pattern after phase 1 to %s" % df)
+                self.pattern.save(df)
             
             # ---------------------
             # second training phase
@@ -330,11 +349,17 @@ class PatternTrainer(object):
                                                   tags= {'beta': False}, )
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
 
+            if self.save_params:
+                df = self._dump_filename + "_" + self.procedure + "_phase2"
+                if verbose:
+                    print ("Storing pattern after phase 2 to %s" % df)
+                self.pattern.save(df)
+
         # ========================================================
         elif self.procedure == 'simultaneous':
             if verbose:
                 print ("Optimize phi & psi & beta using a weighted sum of target and side objective")
-            if data_alignment == "XYC":
+            if data_alignment == "XYZ":
                 print ("   -> standard mode with single training function")
                 train_fn = self._compile_train_fn(self.pattern.training_input_vars,
                                                   loss_weights=self.loss_weights,
@@ -357,6 +382,12 @@ class PatternTrainer(object):
                 train_fn = [train_fn1, train_fn2]
                 
             self._train(train_fn, batch_iterators, batch_iterator_args_lst, X_val, y_val, verbose=verbose)
+
+            if self.save_params:
+                df = self._dump_filename + "_" + self.procedure
+                if verbose:
+                    print ("Storing pattern to %s" % df)
+                self.pattern.save(df)
         
         return self
 
