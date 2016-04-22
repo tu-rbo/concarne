@@ -231,7 +231,7 @@ class Pattern(object):
             if isinstance(self.input_shape, int):
                 input_dim = (None, self.input_shape)
             self.input_layer = lasagne.layers.InputLayer(shape=input_dim,
-                                        input_var=self.input_var)
+                                        input_var=self.input_var, name="input")
 
         return self.input_layer
 
@@ -281,13 +281,13 @@ class Pattern(object):
         raise NotImplemented()
                                        
 
-    def _get_all_function_layers(self, fun_name):
+    def _get_all_function_layers(self, fun):
         """
-         Get only the layers that belong to a certain pattern.
+         Get only the layers that belong to a certain function
         """
         layers = []
-        for l in lasagne.layers.get_all_layers(self.beta):
-          if l._pattern_function == fun_name:
+        for l in lasagne.layers.get_all_layers(fun):
+          if l._pattern_function == fun._fun_name:
             layers.append(l)
         return layers            
             
@@ -642,11 +642,14 @@ class Pattern(object):
          input to the network (depending on the pattern, often phi's input).
 
         """
-        if type(fun_or_fun_name) != str:
-            fun_or_fun_name = fun_or_fun_name._fun_name
+        
+        if type(fun_or_fun_name) == str:
+            fun = self.__dict__[fun_or_fun_name]
+        else:
+            fun = fun_or_fun_name
         
         last_input = input
-        for l in self._get_all_function_layers(fun_or_fun_name):
+        for l in self._get_all_function_layers(fun):
             last_input = l.get_output_for(last_input, **kwargs)
         return last_input    
 
