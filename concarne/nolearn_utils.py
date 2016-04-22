@@ -19,11 +19,7 @@ from nolearn.lasagne.base import Layers
 import nolearn.lasagne.handlers
 import nolearn.lasagne.visualize
 
-PrintLayerInfo = nolearn.lasagne.handlers.PrintLayerInfo
-plot_conv_weights = nolearn.lasagne.visualize.plot_conv_weights
-plot_conv_activity = nolearn.lasagne.visualize.plot_conv_activity
-plot_occlusion = nolearn.lasagne.visualize.plot_occlusion
-
+        
 def pattern2neuralnet(pattern, verbose=0):
     pattern.layers = []
     pattern.layers_ = Layers()
@@ -45,5 +41,9 @@ def pattern2neuralnet(pattern, verbose=0):
             dct['name'] = name
             pattern.layers_[name] = l    
             pattern.layers.append (( l.__class__, dct))
-            
+    
+    return pattern
 
+class PrintLayerInfo(nolearn.lasagne.handlers.PrintLayerInfo):
+    def __call__(self, pattern, train_history=None):
+        nolearn.lasagne.handlers.PrintLayerInfo.__call__(self, pattern2neuralnet(pattern), train_history=None)
