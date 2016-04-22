@@ -145,9 +145,11 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
         if self.side_connect_layer is None:
           # create connection layer
           if self.beta_input_mode == "diff":
-            self.side_connect_layer = lasagne.layers.ElemwiseSumLayer([self.phi, self.phi])
+            self.side_connect_layer = lasagne.layers.ElemwiseSumLayer(
+                [self.phi, self.phi], name="stack")
           elif self.beta_input_mode == "stacked":
-            self.side_connect_layer = lasagne.layers.ConcatLayer([self.phi, self.phi])
+            self.side_connect_layer = lasagne.layers.ConcatLayer(
+                [self.phi, self.phi], name="concat")
         return self.side_connect_layer
 
     @property  
