@@ -73,7 +73,7 @@ class PatternTrainer(object):
             Number of epochs used to run SGD
         learning_rate: float
             Learning for SGD
-        learning_rate: int
+        batch_size: int
             Batch size for SGD (irrelevant if you specify the iterator for
             the fit_*** methods yourself)
         momentum: float
@@ -254,10 +254,10 @@ class PatternTrainer(object):
             (rows: samples, cols: features)
         Y :  numpy array
             Labels / target data (per default each array should have same len as X1)
-        batch_iterator_XY: iterator, optional
-            Your custom iterator for going through the X-Y data
         batch_iterator_XZ: iterator, optional
             Your custom iterator for going through the X-Z data
+        batch_iterator_XY: iterator, optional
+            Your custom iterator for going through the X-Y data
         X_val: numpy array, optional
             Validation input data
         y_val: numpy array, optional

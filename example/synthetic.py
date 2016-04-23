@@ -408,6 +408,7 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
                                                batchsize,
                                                momentum,
                                                procedure,
+                                               save_params=True,
                                                **loss_weights
                                                )
     print("Starting training...")
