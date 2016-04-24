@@ -265,7 +265,7 @@ def main(pattern, data_representation, procedure, num_epochs, XZ_num_epochs, bat
                                                XZ_num_epochs=XZ_num_epochs,
                                                XYpsi_num_epochs=50,
                                                update_momentum=momentum,
-                                               update_learning_rate=learning_rate/20,
+                                               update_learning_rate=learning_rate/100,
                                                XZ_update_learning_rate=learning_rate,
                                                XZ_update_momentum=momentum,
                                                target_weight=loss_weights['target_weight'],
@@ -298,9 +298,9 @@ if __name__ == '__main__':
     parser.add_argument("training_procedure", type=str, help="which training procedure to use",
                         default='pretrain_finetune', nargs='?',
                         choices=['decoupled', 'pretrain_finetune', 'simultaneous'])
-    parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
+    parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=100, required=False)
     parser.add_argument("--XZ_num_epochs", type=int, help="number of epochs for SGD "
-        "XZ-phase (decoupled and pretrain_finetune only) ", default=500, required=False)
+        "XZ-phase (decoupled and pretrain_finetune only) ", default=600, required=False)
     parser.add_argument("--batch_size", type=int, help="batch size for SGD", default=20, required=False)
     args = parser.parse_args()
 
