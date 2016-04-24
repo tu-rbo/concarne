@@ -503,13 +503,17 @@ class PatternTrainer(object):
                 lw1['target_weight'] = 0.
                 train_fn1 = self._compile_train_fn(train_vars_phase1,
                     loss_weights=lw1, 
-                    tags= {'psi': False} ) 
+                    tags= {'psi': False},
+                    update=self.update,
+                    **update_params)
 
                 lw2 = copy.copy(self.loss_weights)
                 lw2['side_weight'] = 0.
                 train_fn2 = self._compile_train_fn(train_vars_phase2,
                     loss_weights=lw2, 
-                    tags= {'beta': False} )
+                    tags= {'beta': False},
+                    update=self.update,
+                    **update_params)
 
                 train_fn = [train_fn1, train_fn2]
                 
