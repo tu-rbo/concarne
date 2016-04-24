@@ -14,7 +14,7 @@ repository root with the command
  python -m example.synthetic <parameters>
 
 The script accepts a couple of parameters, e.g.
-  python synthetic.py multiview direct simultaneous --num_epochs 500 --batchsize 50
+  python synthetic.py multiview direct simultaneous --num_epochs 500 --batch_size 50
   
 Run the script with 
   python synthetic.py --help
@@ -307,13 +307,11 @@ def build_pw_transformation_pattern(input_var, target_var, side_var, side_transf
 
 #  ########################## Main ###############################
 
-def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
-#if __name__ == "__main__":
-#    pattern_type="multiview"
-#    data='direct'
-#    num_epochs=500
-#    batchsize=50
+def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batch_size=50):
     #theano.config.on_unused_input = 'ignore'
+
+    if XZ_num_epochs is None:
+        XZ_num_epochs = num_epochs
 
     print ("Pattern: %s" % pattern_type)
 
@@ -398,16 +396,18 @@ def main(pattern_type, data, procedure, num_epochs=500, batchsize=50):
         
         learning_rate=0.0001        
         loss_weights = {'target_weight':0.1, 'side_weight':0.9}
-    
+        
     # ------------------------------------------------------
-    # Get the loss expression for training
+    # Instantiate pattern trainer
     
     trainer = concarne.training.PatternTrainer(pattern,
-                                               num_epochs,
-                                               learning_rate,
-                                               batchsize,
-                                               momentum,
                                                procedure,
+                                               num_epochs=num_epochs,
+                                               batch_size=batch_size,
+                                               XZ_num_epochs=XZ_num_epochs,
+                                               update=lasagne.updates.nesterov_momentum,
+                                               update_learning_rate=learning_rate,
+                                               update_momentum=momentum,
                                                save_params=True,
                                                **loss_weights
                                                )
@@ -434,7 +434,10 @@ if __name__ == '__main__':
     parser.add_argument("procedure", nargs='?', type=str, help="training procedure", 
                         default='simultaneous', choices=['decoupled', 'simultaneous', 'pretrain_finetune'])
     parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
-    parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=50, required=False)
+    parser.add_argument("--XZ_num_epochs", type=int, help="number of epochs for SGD "
+        "XZ-phase (decoupled and pretrain_finetune only) ", default=500, required=False)
+    parser.add_argument("--batch_size", type=int, help="batch size for SGD", default=50, required=False)
     args = parser.parse_args()
   
-    trainer = main(args.pattern, args.data, args.procedure, args.num_epochs, args.batchsize)
+    trainer = main(args.pattern, args.data, args.procedure, args.num_epochs, 
+        args.XZ_num_epochs, args.batch_size)

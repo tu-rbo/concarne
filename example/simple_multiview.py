@@ -169,11 +169,12 @@ if __name__ == "__main__":
     # instantiate the PatternTrainer which trains the pattern via stochastic
     # gradient descent
     trainer = concarne.training.PatternTrainer(pattern,
-                                               num_epochs=200,
-                                               learning_rate=0.01,
-                                               batch_size=10,
-                                               momentum=0.9,
                                                procedure='simultaneous',
+                                               num_epochs=200,
+                                               batch_size=10,
+                                               update=lasagne.updates.nesterov_momentum,
+                                               update_learning_rate=0.01,
+                                               update_momentum=0.9,
                                                )
    
     # we use the fit_XYC method because our X, Y and C data all have the same

@@ -104,16 +104,18 @@ You can now read the documentation by opening docs/_build/html/index.html
 
 If you use concarne in your scientific work, please consider citing the following paper:
 
-@article{
-  author    = {Rico Jonschkowski and Sebastian H{\"{o}}fer and Oliver Brock},
-  title     = {Patterns for Learning with Side Information},
-  volume    = {arXiv:1511.06429 [cs.LG]},
-  year      = {2016},
-  url       = {http://arxiv.org/abs/1511.06429},
-}
+ @article{
+   author    = {Rico Jonschkowski and Sebastian H{\"{o}}fer and Oliver Brock},
+   title     = {Patterns for Learning with Side Information},
+   volume    = {arXiv:1511.06429 [cs.LG]},
+   year      = {2016},
+   url       = {http://arxiv.org/abs/1511.06429},
+ }
 
 We would also be glad if you sent us a copy of your paper!
 
 ### Disclaimer
+
+Parts of concarne contain code from the [nolearn](https://github.com/dnouri/nolearn) library, Copyright (c) 2012-2015 Daniel Nouri.
 
 No animals were harmed during the development of this framework.

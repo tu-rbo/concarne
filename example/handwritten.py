@@ -110,7 +110,7 @@ def load_handwritten_data_easy():
 
 
 # ############################# Helper functions #################################
-def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
+def iterate_minibatches(inputs, targets, batch_size, shuffle=False):
     """ Simple iterator for direct pattern """
     assert len(inputs) == len(targets)
     indices = np.arange(len(inputs))
@@ -118,8 +118,8 @@ def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
     if shuffle:
         np.random.shuffle(indices)
 
-    for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
-        excerpt = indices[start_idx:start_idx + batchsize]
+    for start_idx in range(0, len(inputs) - batch_size + 1, batch_size):
+        excerpt = indices[start_idx:start_idx + batch_size]
         yield inputs[excerpt], targets[excerpt]
 
 
@@ -189,12 +189,13 @@ def build_multiview_pattern(input_var, target_var, side_var, input_shape, n_hidd
 
 
 # ########################## Main ###############################
-def main(pattern, data_representation, procedure, num_epochs, batchsize):
+def main(pattern, data_representation, procedure, num_epochs, XZ_num_epochs, batch_size):
     print("Pattern: {}".format(pattern))
     print("Data representation: {}".format(data_representation))
     print("Training procedure: {}".format(procedure))
     print("#Epochs: {}".format(num_epochs))
-    print("Batchsize: {}".format(batchsize))
+    print("#Epochs_XZ: {}".format(XZ_num_epochs))
+    print("Batchsize: {}".format(batch_size))
 
     if pattern == "multiview":
         assert (procedure == "simultaneous")
@@ -231,7 +232,8 @@ def main(pattern, data_representation, procedure, num_epochs, batchsize):
 
     # ------------------------------------------------------
     # Build pattern
-    learning_rate = 0.003
+    #learning_rate = 0.003
+    learning_rate = 0.00003
     momentum = 0.5
     loss_weights = {'target_weight': 0.5, 'side_weight': 0.5}  # default to uniform weighting
     if pattern == "direct":
@@ -257,13 +259,17 @@ def main(pattern, data_representation, procedure, num_epochs, batchsize):
     # Get the loss expression for training
 
     trainer = concarne.training.PatternTrainer(pattern,
-                                               num_epochs,
-                                               learning_rate,
-                                               batchsize,
-                                               momentum,
                                                procedure,
-                                               loss_weights['target_weight'],
-                                               loss_weights['side_weight'])
+                                               num_epochs=num_epochs,
+                                               batch_size=batch_size,
+                                               XZ_num_epochs=XZ_num_epochs,
+                                               update_momentum=momentum,
+                                               update_learning_rate=100*learning_rate,
+                                               XZ_update_learning_rate=learning_rate,
+                                               XZ_update_momentum=momentum,
+                                               target_weight=loss_weights['target_weight'],
+                                               side_weight=loss_weights['side_weight'],
+                                               save_params=True)
     print("Starting training...")
     trainer.fit_XZ_XY(X_train, [C_train], X_sup, y_sup, X_val=X_test, y_val=y_test, verbose=True)
 
@@ -286,7 +292,10 @@ if __name__ == '__main__':
                         default='pretrain_finetune', nargs='?',
                         choices=['decoupled', 'pretrain_finetune', 'simultaneous'])
     parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=100, required=False)
-    parser.add_argument("--batchsize", type=int, help="batch size for SGD", default=20, required=False)
+    parser.add_argument("--XZ_num_epochs", type=int, help="number of epochs for SGD "
+        "XZ-phase (decoupled and pretrain_finetune only) ", default=2, required=False)
+    parser.add_argument("--batch_size", type=int, help="batch size for SGD", default=20, required=False)
     args = parser.parse_args()
 
-    pattern = main(args.pattern, args.data_representation, args.training_procedure, args.num_epochs, args.batchsize)
+    pattern = main(args.pattern, args.data_representation, args.training_procedure, 
+        args.num_epochs, args.XZ_num_epochs, args.batch_size)

@@ -13,6 +13,8 @@ import datetime
 import time
 import copy
 
+from warnings import warn
+
 class PatternTrainer(object):
     """The :class:`PatternTrainer` provides a simple way of training any given pattern 
        consisting of lasagne layers as functions using mini batch stochastic 
@@ -23,7 +25,8 @@ class PatternTrainer(object):
        
        Example with aligned data X_train, y_train and Z_train::
        
-        > pt = concarne.training.PatternTrainer(pattern, 5, 0.0001, 50, 
+        > pt = concarne.training.PatternTrainer(pattern, 5, 50, 
+                     update_learning_rate=0.0001,
                      target_weight=0.9, side_weight=0.1, verbose=True)
         > pt.fit_XYZ(X_train, y_train, Z_train, X_val=X_val, y_val=y_val)
             Training procedure: simultaneous
@@ -69,15 +72,6 @@ class PatternTrainer(object):
        ----------       
         pattern :  :class:`Pattern`
             Instance of a pattern
-        num_epochs :  int
-            Number of epochs used to run SGD
-        learning_rate: float
-            Learning for SGD
-        batch_size: int
-            Batch size for SGD (irrelevant if you specify the iterator for
-            the fit_*** methods yourself)
-        momentum: float
-            Momentum weight (currently using Nesterov momentum)
         procedure: {'decoupled', 'pretrain_finetune', 'simultaneous'}
             Three training procedures are supported. decoupled and 
             pretrain_finetune both use a two stage process, whereas
@@ -87,6 +81,36 @@ class PatternTrainer(object):
             representation s, since in the second training phase 
             :math:`\phi` is not changed anymore. In pretrain_finetune,
             :math:`\phi` is also optimized in the second training phase.
+        update: lasagne.updates.***
+            Update method for parameters after epoch. Default: nesterov_momentum.
+            Additional params for the update method should be provided using
+            keyword arguments 'update_<arg_name>'.
+        XZ_update: lasagne.updates.***
+            Different update method for parameters in the decoupled or pretrain_finetune
+            procedures (ignored in simultaneous), optional.
+            Additional params for the update method should be provided using
+            keyword arguments 'XZ_update_<arg_name>'.            
+        batch_size: int
+            Batch size for SGD.
+            Irrelevant if you specify the iterator for the fit_*** methods yourself.
+        XZ_batch_size: int
+            Different batch size for SGD in the decoupled or pretrain_finetune
+            procedures (ignored in simultaneous).
+            Irrelevant if you specify the iterator for the fit_*** methods yourself.
+        num_epochs :  int
+            Number of epochs used to run SGD
+        XZ_num_epochs : int
+            Number of epochs to run for XZ in the decoupled or pretrain_finetune
+            procedures (ignored in simultaneous), optional
+        XYpsi_num_epochs : int
+            Number of epochs to run for XY optimizing only psi (keeping phi fixed)
+            in the pretrain_finetune. It can be thought of an intermediate 
+            third training stage after pre-training with the side information,
+            but before training both psi and phi with the targets.
+            It can be sometimes helpful because psi is usually initialized randomly,
+            and will therefore produce mostly wrong predicitions, leading to large errors;
+            propagating these errors through phi might destroy the pre-training.
+            Default value is 0.
         target_weight: float, optional
             only required for simultaneous training procedure
         side_weight: float, optional
@@ -106,23 +130,57 @@ class PatternTrainer(object):
             The file format is 'pt_<timestamp>.tar'.
         """
     def __init__(self, pattern, 
-                 num_epochs, 
-                 learning_rate,
-                 batch_size,
-                 momentum=0.9,
                  procedure="simultaneous", 
+                 update=lasagne.updates.nesterov_momentum,
+                 XZ_update=None,
+                 batch_size=100,
+                 XZ_batch_size=None,
+                 num_epochs=500, 
+                 XZ_num_epochs=None,
+                 XYpsi_num_epochs=None,
                  target_weight=None, 
                  side_weight=None,
                  test_objective=lasagne.objectives.categorical_crossentropy,
                  verbose=None,
-                 save_params=False):
+                 save_params=False,
+                 **kwargs):
         self.pattern = pattern
-        self.num_epochs = num_epochs
-        self.batch_size = batch_size
-        self.learning_rate = learning_rate
-        self.momentum = momentum
         self.procedure = procedure
         assert (procedure in ["simultaneous", "decoupled", "pretrain_finetune"])
+
+        self.update = update
+        
+        self.XZ_update = self.update
+        if XZ_update is not None:
+            self.XZ_update = XZ_update
+            if procedure == "simultaneous":
+                warn("XZ_update has been provided, but procedure is 'simultaneous'; "
+                     "ignoring")
+        
+        self.num_epochs = num_epochs
+
+        self.XZ_num_epochs = num_epochs
+        if XZ_num_epochs is not None:
+            self.XZ_num_epochs = XZ_num_epochs
+            if procedure == "simultaneous":
+                warn("XZ_num_epochs has been provided, but procedure is 'simultaneous'; "
+                     "ignoring")
+
+        self.batch_size = batch_size
+
+        self.XZ_batch_size = batch_size
+        if XZ_batch_size is not None:
+            self.XZ_batch_size = XZ_batch_size
+            if procedure == "simultaneous":
+                warn("XZ_batch_size has been provided, but procedure is 'simultaneous'; "
+                     "ignoring")
+
+        self.XYpsi_num_epochs = 0
+        if XYpsi_num_epochs is not None:
+            self.XYpsi_num_epochs = XYpsi_num_epochs
+            if procedure != "pretrain_finetune":
+                warn("XYpsi_num_epochs has been provided, but procedure is NOT "
+                     "'pretrain_finetune'; ignoring")
         
         # target_weight and side_weight are only relevant for simultaneous
         self.loss_weights = {}
@@ -136,24 +194,61 @@ class PatternTrainer(object):
         
         self.val_fn = None
         self.val_batch_iterator = None
-        
-        if verbose is not None:
-            print ("WARN: passing verbose to constructor of PatternTrainer is deprecated."+
-                " Use verbose flags for fit*** and score methods instead." )
-                
+                        
         self.save_params = save_params
         if self.save_params:
             ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
             self._dump_filename = "pt_%s" % ts
 
-    def _compile_train_fn(self, train_fn_inputs, loss_weights, tags):
+        # deprecation warnings
+        if verbose is not None:
+            warn("passing verbose to constructor of PatternTrainer is deprecated."+
+                " Use verbose flags for fit*** and score methods instead." )
+
+        if 'learning_rate' in kwargs:
+            warn("The 'learning_rate' argument has been deprecated, please use "
+                 "the 'update_learning_rate' parameter instead and make sure you use "
+                 "'update=nesterov_momentum'" )
+            self.update_learning_rate = kwargs['learning_rate']
+            del kwargs['learning_rate']
+
+        if 'momentum' in kwargs:
+            warn("The 'momentum' argument has been deprecated, please use "
+                 "the 'update_momentum' parameter instead and make sure you use "
+                 "'update=nesterov_momentum'" )
+            self.update_momentum = kwargs['momentum']
+            del kwargs['momentum']
+
+        # store remaining kw_args
+        for key in kwargs.keys():
+            assert not hasattr(self, key)
+        vars(self).update(kwargs)
+        self._kwarg_keys = list(kwargs.keys())
+
+
+    def _get_params_for(self, name):
+        collected = {}
+        prefix = '{}_'.format(name)
+
+        params = vars(self)
+        #more_params = self.more_params
+
+        #for key, value in itertools.chain(params.items(), more_params.items()):
+        for key, value in params.items():
+            if key.startswith(prefix):
+                collected[key[len(prefix):]] = value
+
+        return collected
+
+    def _compile_train_fn(self, train_fn_inputs, loss_weights, tags, update, **update_params):
         loss = self.pattern.training_loss(**loss_weights).mean()
         
         params = lasagne.layers.get_all_params(self.pattern, trainable=True, **tags)
 
         # TODO add possibility to use different update mechanism
-        updates = lasagne.updates.nesterov_momentum(
-            loss, params, learning_rate=self.learning_rate, momentum=self.momentum)
+        #updates = lasagne.updates.nesterov_momentum(
+        #    loss, params, learning_rate=self.updates_learning_rate, momentum=self.updates_momentum)
+        updates = update(loss, params, **update_params)
     
 #        print (params)
 #        print (updates)
@@ -223,15 +318,26 @@ class PatternTrainer(object):
             raise Exception("Make sure that you provide a list of side "
                 + " information Zs, even if the pattern only expects one side variable")
 
+        batch_iterators = []
         if batch_iterator is None:
             batch_iterator = AlignedBatchIterator(self.batch_size, shuffle=True)
+            batch_iterators.append(batch_iterator)
+
+        if self.batch_size != self.XZ_batch_size:
+            batch_iterator_XZ = AlignedBatchIterator(self.XZ_batch_size, shuffle=True)
+            batch_iterators.append(batch_iterator_XZ)
+        else:
+            # twice the same
+            batch_iterators.append(batch_iterator)
 
         batch_iterator_args = [X, Y] + Zs
         if not all_elements_equal_len(batch_iterator_args):
             raise Exception("X, Y and Z must have same len!")
 
-        return self._fit([batch_iterator]*2, [batch_iterator_args]*2, 
+        return self._fit(batch_iterators, [batch_iterator_args]*2, 
                          "XYZ", X_val, y_val, verbose)
+
+
         
     def fit_XZ_XY(self, X1, Zs, X2, Y,
             batch_iterator_XZ=None,
@@ -271,7 +377,7 @@ class PatternTrainer(object):
         if batch_iterator_XY is None:
             batch_iterator_XY = AlignedBatchIterator(self.batch_size, shuffle=True)
         if batch_iterator_XZ is None:
-            batch_iterator_XZ = AlignedBatchIterator(self.batch_size, shuffle=True)
+            batch_iterator_XZ = AlignedBatchIterator(self.XZ_batch_size, shuffle=True)
 
         batch_iterators = [
             batch_iterator_XZ,
@@ -307,6 +413,17 @@ class PatternTrainer(object):
             train_vars_phase1 = [self.pattern.input_var] + list(self.pattern.side_vars) # XZ
             train_vars_phase2 = [self.pattern.input_var, self.pattern.target_var] # XY
 
+        update_params = self._get_params_for('update')
+        update_params_XZ = self._get_params_for('XZ_update')
+        if len(update_params_XZ) == 0: # Assumining u
+            update_params_XZ = update_params
+
+        print ("update_params_XZ")
+        print (update_params_XZ)
+
+        print ("update_params")
+        print (update_params)
+
         # ========================================================
         if self.procedure in ['decoupled', 'pretrain_finetune']:
             # ---------------------
@@ -314,11 +431,15 @@ class PatternTrainer(object):
             if verbose:
                 print ("Optimize phi & beta using the side objective")
                 
+            
+                
             train_fn = self._compile_train_fn(train_vars_phase1,
                                               loss_weights={'target_weight': 0.0, 'side_weight': 1.0}, 
-                                              tags= {'psi': False}, )
+                                              tags= {'psi': False}, 
+                                              update=self.XZ_update,
+                                              **update_params_XZ)
             # passing X_val and y_val doesn't make sense because psi is not trained
-            self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]], verbose=verbose)
+            self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]], self.XZ_num_epochs, verbose=verbose)
             
             if self.save_params:
                 df = self._dump_filename + "_" + self.procedure + "_phase1"
@@ -333,21 +454,36 @@ class PatternTrainer(object):
                     print ("=====\nOptimize psi using the target objective")
                 train_fn = self._compile_train_fn(train_vars_phase2,
                                                   loss_weights={'target_weight': 1.0, 'side_weight': 0.0}, 
-                                                  tags= {'phi': False, 'beta': False }, ) # beta: False is implicit
-                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
+                                                  tags= {'phi': False, 'beta': False },  # beta: False is implicit
+                                                  update=self.update,
+                                                  **update_params)
+                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], self.num_epochs, X_val, y_val, verbose)
             elif self.procedure == 'pretrain_finetune':
-                if verbose:
-                    print ("=====\nOptimize psi using the target objective")
-                train_fn = self._compile_train_fn(train_vars_phase2,
-                                                  loss_weights={'target_weight': 1.0, 'side_weight': 0.0}, 
-                                                  tags= {'psi': True}, )
-                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
+                # intermediate training phase - train psi only, keeping phi fixed
+                if self.XYpsi_num_epochs > 0:
+                    if verbose:
+                        print ("=====\nOptimize psi using the target objective")
+                    train_fn = self._compile_train_fn(train_vars_phase2,
+                                                      loss_weights={'target_weight': 1.0, 'side_weight': 0.0}, 
+                                                      tags= {'psi': True}, 
+                                                      update=self.XZ_update,
+                                                      **update_params_XZ)
+                    self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], self.XYpsi_num_epochs, X_val, y_val, verbose)
+
+                    if self.save_params:
+                        df = self._dump_filename + "_" + self.procedure + "_phase2_psionly"
+                        if verbose:
+                            print ("Storing pattern after phase 2 (psi only) to %s" % df)
+                        self.pattern.save(df)
+                    
                 if verbose:
                     print ("=====\nOptimize phi & psi using the target objective")
                 train_fn = self._compile_train_fn(train_vars_phase2,
                                                   loss_weights={'target_weight': 1.0, 'side_weight': 0.0},
-                                                  tags= {'beta': False}, )
-                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], X_val, y_val, verbose)
+                                                  tags= {'beta': False}, 
+                                                  update=self.XZ_update,
+                                                  **update_params_XZ)
+                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], self.num_epochs, X_val, y_val, verbose)
 
             if self.save_params:
                 df = self._dump_filename + "_" + self.procedure + "_phase2"
@@ -363,7 +499,9 @@ class PatternTrainer(object):
                 print ("   -> standard mode with single training function")
                 train_fn = self._compile_train_fn(self.pattern.training_input_vars,
                                                   loss_weights=self.loss_weights,
-                                                  tags= {} )
+                                                  tags= {},
+                                                  update=self.update,
+                                                  **update_params)
                 train_fn = [train_fn]*2
             else:
                 print ("   -> alternating mode with two training functions")
@@ -381,7 +519,7 @@ class PatternTrainer(object):
 
                 train_fn = [train_fn1, train_fn2]
                 
-            self._train(train_fn, batch_iterators, batch_iterator_args_lst, X_val, y_val, verbose=verbose)
+            self._train(train_fn, batch_iterators, batch_iterator_args_lst, self.num_epochs, X_val, y_val, verbose=verbose)
 
             if self.save_params:
                 df = self._dump_filename + "_" + self.procedure
@@ -391,7 +529,7 @@ class PatternTrainer(object):
         
         return self
 
-    def _train(self, train_fns, batch_iterators, batch_iterator_args_lst, X_val=None, y_val=None, verbose=False):
+    def _train(self, train_fns, batch_iterators, batch_iterator_args_lst, num_epochs, X_val=None, y_val=None, verbose=False):
 
         if self.val_fn is None:
             self.val_fn = self._compile_val_fn()
@@ -406,7 +544,7 @@ class PatternTrainer(object):
         if verbose:
             print("Starting training...")
         # We iterate over epochs:
-        for epoch in range(self.num_epochs):
+        for epoch in range(num_epochs):
             # In each epoch, we do a full pass over the training data:
             train_err = 0
             train_batches = 0
@@ -428,7 +566,7 @@ class PatternTrainer(object):
             # Then we print the results for this epoch:
             if verbose:
                 print("Epoch {} of {} took {:.3f}s".format(
-                    epoch + 1, self.num_epochs, time.time() - start_time))
+                    epoch + 1, num_epochs, time.time() - start_time))
                 print("  training loss:\t\t{:.6f}".format(train_err / train_batches))
 
                 if X_val is not None and y_val is not None:
