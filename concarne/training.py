@@ -418,12 +418,6 @@ class PatternTrainer(object):
         if len(update_params_XZ) == 0: # Assumining u
             update_params_XZ = update_params
 
-        print ("update_params_XZ")
-        print (update_params_XZ)
-
-        print ("update_params")
-        print (update_params)
-
         # ========================================================
         if self.procedure in ['decoupled', 'pretrain_finetune']:
             # ---------------------
