@@ -227,6 +227,10 @@ class PatternTrainer(object):
 
 
     def _get_params_for(self, name):
+        """This method has been adapted from the NeuralFit class in nolearn.
+        https://github.com/dnouri/nolearn/blob/master/nolearn/lasagne/base.py
+        Copyright (c) 2012-2015 Daniel Nouri"""
+        
         collected = {}
         prefix = '{}_'.format(name)
 
