@@ -35,22 +35,16 @@ class DirectPattern(Pattern):
         assert('beta' not in kwargs)
         super(DirectPattern, self).__init__(**kwargs)
 
-        self._create_target_objective()
-        self._create_side_objective()                                     
+#         self._create_target_objective()
+#         self._create_side_objective()                                     
 
-    def _create_side_objective(self):
-        if self.side_loss is None:
-            assert (self.input_var is not None)
-            assert (self.side_var is not None)
-            
-            if self.side_loss_fn is None:
-                fn = self.default_side_objective
-            else:
-                #print ("Side loss is function object: %s" % str(self.side_loss_fn))
-                fn = self.side_loss_fn
-            
-            self.side_loss = fn(
-                self.get_phi_output_for(self.input_var), self.side_var
-            ).mean()
-            
-            
+    def get_side_objective(self, input, target):
+        if self.side_loss_fn is None:
+            fn = self.default_side_objective
+        else:
+            #print ("Side loss is function object: %s" % str(self.side_loss_fn))
+            fn = self.side_loss_fn
+        
+        return fn(
+            self.get_phi_output_for(input), target
+        ).mean()

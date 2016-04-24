@@ -435,7 +435,7 @@ if __name__ == '__main__':
                         default='simultaneous', choices=['decoupled', 'simultaneous', 'pretrain_finetune'])
     parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
     parser.add_argument("--XZ_num_epochs", type=int, help="number of epochs for SGD "
-        "XZ-phase (decoupled and pretrain_finetune only) ", default=500, required=False)
+        "XZ-phase (decoupled and pretrain_finetune only) ", default=None, required=False)
     parser.add_argument("--batch_size", type=int, help="batch size for SGD", default=50, required=False)
     args = parser.parse_args()
   

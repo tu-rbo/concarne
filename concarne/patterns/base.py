@@ -143,8 +143,17 @@ class Pattern(object):
         for fun, fun_name in zip([self.phi, self.psi, self.beta], ['phi', 'psi', 'beta']):
             self._tag_function_parameters(fun, fun_name)
         
+        self._create_target_objective()
+        self._create_side_objective()                                     
         
+    def get_side_objective(self, input, target):
+        """
+        Pattern-specific function to get the theano expression of the side objective.
         
+        Must be implemented by each pattern.
+        """
+        raise NotImplemented()       
+                
     @property
     def training_input_vars(self):
         """Return the theano variables that are required for training.
@@ -279,7 +288,7 @@ class Pattern(object):
         int or tuple of ints
         """
         raise NotImplemented()
-                                       
+                                
 
     def _get_all_function_layers(self, fun):
         """
@@ -508,10 +517,7 @@ class Pattern(object):
   
     def _create_target_objective(self, output=None, target=None):
         """
-            Helper function that should be called by constructor to build
-            the member variable target_loss.
-            
-            Should be called by the constructor
+        Helper function to build the member variable target_loss.
         """
         if output is None:
             output = self.get_psi_output_for(self.input_var)
@@ -530,6 +536,16 @@ class Pattern(object):
             
             # define target loss
             self.target_loss = fn(output, target).mean()
+
+    def _create_side_objective(self):
+        """
+        Helper function to build the member variable side_loss.
+        """
+        if self.side_loss is None:
+            assert (self.input_var is not None)
+            assert (self.side_var is not None)
+            
+            self.side_loss = self.get_side_objective(self.input_var, self.side_var)
 
     @property
     def output_shape(self):
@@ -653,15 +669,39 @@ class Pattern(object):
             last_input = l.get_output_for(last_input, **kwargs)
         return last_input    
 
-    def training_loss(self, target_weight=0.5, side_weight=0.5):
+    def training_loss(self, target_weight=0.5, side_weight=0.5, all_losses=False):
+        """
+        Compute the sum of the target and side info loss. Returns a theano expression.
+
+        If all_losses is true, additionally to the summed loss the individual (weighted)
+        losses are returned, too.
+
+        Parameters
+        ----------
+        target_weight : float
+            target weight
+        side_weight : float
+            side weight
+        target_weight : float
+            Default false, returns (loss) only.
+            If true, returns tuple (loss, target_loss, side_loss)
+        """
+
         # we need to gate because if we set one weight to 0., we might
         # also want to omit the involved theano variables; w/o the if-else
         # we get an "unconnected inputs" error in theano
-        loss = 0.
+        loss = 0.        
+        tls, sls = np.nan, np.nan
+        
         if target_weight > 0.:
-            loss += target_weight * self.target_loss
+            tls = target_weight * self.target_loss
+            loss += tls
         if side_weight > 0.:
-            loss += side_weight * self.side_loss
+            sls = side_weight * self.side_loss
+            loss += sls
+            
+        if all_losses:
+            return loss, tls, sls        
             
         return loss
 

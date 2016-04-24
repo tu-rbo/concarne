@@ -25,7 +25,8 @@ class PatternTrainer(object):
        
        Example with aligned data X_train, y_train and Z_train::
        
-        > pt = concarne.training.PatternTrainer(pattern, 5, 50, 
+        > pt = concarne.training.PatternTrainer(pattern, 
+                     num_epochs=5, batch_size=50, 
                      update_learning_rate=0.0001,
                      target_weight=0.9, side_weight=0.1, verbose=True)
         > pt.fit_XYZ(X_train, y_train, Z_train, X_val=X_val, y_val=y_val)
@@ -115,12 +116,6 @@ class PatternTrainer(object):
             only required for simultaneous training procedure
         side_weight: float, optional
             only required for simultaneous training procedure
-        test_objective: lasagne objective function, optional
-            The appropriate test objective for the target task.
-            Per default we use lasagne.objectives.categorical_crossentropy
-            which is only applicable if we use a softmax layer as the last
-            layer of :math:`\psi` and if :member:`target_var` has dtype
-            integer.
         verbose: bool, deprecated
             Use the verbose flags in fit_*** and score instead
         save_params: bool
@@ -190,7 +185,8 @@ class PatternTrainer(object):
             if side_weight is not None:
                 self.loss_weights['side_weight'] = side_weight
         
-        self.test_objective = test_objective
+        self.test_objective = pattern.target_loss_fn
+        self.side_test_objective = pattern.side_loss_fn
         
         self.val_fn = None
         self.val_batch_iterator = None
@@ -244,14 +240,37 @@ class PatternTrainer(object):
 
         return collected
 
-    def _compile_train_fn(self, train_fn_inputs, loss_weights, tags, update, **update_params):
-        loss = self.pattern.training_loss(**loss_weights).mean()
-        
-        params = lasagne.layers.get_all_params(self.pattern, trainable=True, **tags)
+    def __softmax_argmax(self, prediction, target):
+        return T.mean(T.eq(T.argmax(prediction, axis=1), target), dtype=theano.config.floatX)    
 
-        # TODO add possibility to use different update mechanism
-        #updates = lasagne.updates.nesterov_momentum(
-        #    loss, params, learning_rate=self.updates_learning_rate, momentum=self.updates_momentum)
+    def _compile_train_fn(self, train_fn_inputs, loss_weights, tags, update, **update_params):
+        loss, target_loss, side_loss = self.pattern.training_loss(all_losses=True, **loss_weights)
+        loss = loss.mean()
+        
+        # collect output dictionary
+        outputs = {}
+        outputs['loss'] = loss
+        try:
+            outputs['target_loss'] =  target_loss.mean()
+        except:
+            pass
+            
+        try:
+            outputs['side_loss'] =  side_loss.mean()
+        except:
+            pass
+        
+        # TODO can we give better feedback for classification case?
+#         target_var = self.pattern.target_var
+#         if self.test_objective == lasagne.objectives.categorical_crossentropy:
+#             outputs['acc'] = self.__softmax_argmax(test_prediction, target_var)
+#         else: 
+#             test_acc = None
+
+
+        # -----
+        # get trainable params and build update
+        params = lasagne.layers.get_all_params(self.pattern, trainable=True, **tags)
         updates = update(loss, params, **update_params)
     
 #        print (params)
@@ -268,7 +287,8 @@ class PatternTrainer(object):
         # training_input_vars methods in the Pattern class
         theano.config.on_unused_input = 'ignore'
 
-        train_fn = theano.function(train_fn_inputs, loss, updates=updates)
+        # finally: build theano training function
+        train_fn = theano.function(train_fn_inputs, outputs, updates=updates)
     
         return train_fn
 
@@ -280,8 +300,7 @@ class PatternTrainer(object):
         test_loss = self.test_objective(test_prediction, target_var).mean()
         # Create an expression for the classification accuracy
         if self.test_objective == lasagne.objectives.categorical_crossentropy:
-            test_acc = T.mean(T.eq(T.argmax(test_prediction, axis=1), target_var),
-                              dtype=theano.config.floatX)
+            test_acc = self.__softmax_argmax(test_prediction, target_var)
         else: 
             test_acc = None
     
@@ -297,6 +316,7 @@ class PatternTrainer(object):
     def fit_XYZ(self, X, Y, Zs,
             batch_iterator=None, 
             X_val=None, y_val=None,
+            Zs_val=None,
             verbose=False):
         """Training function for aligned data (same number of examples for
        X, Y and Z)
@@ -316,6 +336,11 @@ class PatternTrainer(object):
             Validation input data
         y_val: numpy array, optional
             Validation labeled data
+        Zs_val: numpy array, optional
+            Validation data for side information 
+            (useful in predictive patterns, e.g. multi-task)
+        verbose: bool / int
+            Verbosity level (default 0/False)
         """
 
         if not isiterable(Zs):
@@ -339,7 +364,7 @@ class PatternTrainer(object):
             raise Exception("X, Y and Z must have same len!")
 
         return self._fit(batch_iterators, [batch_iterator_args]*2, 
-                         "XYZ", X_val, y_val, verbose)
+                         "XYZ", X_val, y_val, Zs_val, verbose)
 
 
         
@@ -347,6 +372,7 @@ class PatternTrainer(object):
             batch_iterator_XZ=None,
             batch_iterator_XY=None, 
             X_val=None, y_val=None,
+            Zs_val=None,
             verbose=False):
         """Training function for unaligned data (one data set for X and Z,
            another data set for X and Y)
@@ -372,6 +398,11 @@ class PatternTrainer(object):
             Validation input data
         y_val: numpy array, optional
             Validation labeled data
+        Zs_val: numpy array, optional
+            Validation data for side information 
+            (useful in predictive patterns, e.g. multi-task)
+        verbose: bool / int
+            Verbosity level (default 0/False)
         """
         
         if not isiterable(Zs):
@@ -395,15 +426,33 @@ class PatternTrainer(object):
             raise Exception("X2 and Y must have same len!")
             
         return self._fit(batch_iterators, batch_iterator_args_lst, 
-                         "XZ_XY", X_val, y_val, verbose)
+                         "XZ_XY", X_val, y_val, Zs_val, verbose)
+
+    def __update_info(self, update, update_params):
+        return ("Update: %s(%s) " % (update.__name__,
+          ", ".join([ "%s=%s" % (k, str(v)) for k,v in update_params.items() ])))
+
         
     def _fit(self, batch_iterators, batch_iterator_args_lst, data_alignment="XYZ", 
-                X_val=None, y_val=None, verbose=False,):
+                X_val=None, y_val=None, Zs_val=None, verbose=False,):
 
         assert (data_alignment in ["XYZ", "XZ_XY"])
 
-        if X_val is not None and y_val is not None:
-            assert (len(X_val) == len(y_val))
+        if Zs_val is not None:
+            # FIXME
+            warn("Zs_val not yet supported; ignoring")
+            Zs_val = None
+
+        # check length of validation args
+        if X_val is not None:
+            val_args = [X_val, y_val]
+            if Zs_val is not None:
+                val_args += Zs_val
+            if not all_elements_equal_len(val_args):
+                raise Exception("X_val, Y_val and Zs_val must have same len!")
+                            
+        #if X_val is not None and y_val is not None:
+        #    assert (len(X_val) == len(y_val))
 
         # training procedures
         if verbose:
@@ -428,8 +477,7 @@ class PatternTrainer(object):
             # first training phase
             if verbose:
                 print ("Optimize phi & beta using the side objective")
-                
-            
+                print (" "+self.__update_info(self.XZ_update, update_params_XZ))
                 
             train_fn = self._compile_train_fn(train_vars_phase1,
                                               loss_weights={'target_weight': 0.0, 'side_weight': 1.0}, 
@@ -450,17 +498,20 @@ class PatternTrainer(object):
             if self.procedure == 'decoupled':
                 if verbose:
                     print ("=====\nOptimize psi using the target objective")
+                    print (" "+self.__update_info(self.update, update_params))
                 train_fn = self._compile_train_fn(train_vars_phase2,
                                                   loss_weights={'target_weight': 1.0, 'side_weight': 0.0}, 
                                                   tags= {'phi': False, 'beta': False },  # beta: False is implicit
                                                   update=self.update,
                                                   **update_params)
                 self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], self.num_epochs, X_val, y_val, verbose)
+                
             elif self.procedure == 'pretrain_finetune':
                 # intermediate training phase - train psi only, keeping phi fixed
                 if self.XYpsi_num_epochs > 0:
                     if verbose:
                         print ("=====\nOptimize psi using the target objective")
+                        print (" "+self.__update_info(self.XZ_update, update_params_XZ))
                     train_fn = self._compile_train_fn(train_vars_phase2,
                                                       loss_weights={'target_weight': 1.0, 'side_weight': 0.0}, 
                                                       tags= {'psi': True}, 
@@ -476,6 +527,7 @@ class PatternTrainer(object):
                     
                 if verbose:
                     print ("=====\nOptimize phi & psi using the target objective")
+                    print (" "+self.__update_info(self.update, update_params))
                 train_fn = self._compile_train_fn(train_vars_phase2,
                                                   loss_weights={'target_weight': 1.0, 'side_weight': 0.0},
                                                   tags= {'beta': False}, 
@@ -493,6 +545,7 @@ class PatternTrainer(object):
         elif self.procedure == 'simultaneous':
             if verbose:
                 print ("Optimize phi & psi & beta using a weighted sum of target and side objective")
+                print (" "+self.__update_info(self.update, update_params))
             if data_alignment == "XYZ":
                 print ("   -> standard mode with single training function")
                 train_fn = self._compile_train_fn(self.pattern.training_input_vars,
@@ -549,14 +602,21 @@ class PatternTrainer(object):
         for epoch in range(num_epochs):
             # In each epoch, we do a full pass over the training data:
             train_err = 0
+            train_target_err = 0
+            train_side_err = 0
             train_batches = 0
             start_time = time.time()
             
             for train_fn, batch_iterator, batch_iterator_args \
                 in zip(train_fns, batch_iterators, batch_iterator_args_lst):
                 for batch in batch_iterator(*batch_iterator_args):
-                    train_err += train_fn(*batch)
+                    outputs = train_fn(*batch)
+                    train_err += outputs['loss']
                     train_batches += 1
+                    if 'target_loss' in outputs:
+                        train_target_err += outputs['target_loss']
+                    if 'side_loss' in outputs:
+                        train_side_err += outputs['side_loss']
             train_batches /= len(train_fns)
 
             # And a pass over the validation data:
@@ -570,11 +630,13 @@ class PatternTrainer(object):
                 print("Epoch {} of {} took {:.3f}s".format(
                     epoch + 1, num_epochs, time.time() - start_time))
                 print("  training loss:\t\t{:.6f}".format(train_err / train_batches))
-
+                print("   (target: {:.6f}, ".format(train_target_err / train_batches)
+                     + " side: {:.6f})".format(train_side_err / train_batches))
+                    
                 if X_val is not None and y_val is not None:
                     print("  validation loss:\t\t{:.6f}".format(val_err))
                     print("  validation accuracy:\t\t{:.2f} %".format(val_acc * 100))
-                    
+                                        
     def score(self, X, y, batch_size=None, verbose=False):
         """
         Parameters
