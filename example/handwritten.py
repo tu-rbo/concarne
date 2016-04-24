@@ -232,8 +232,8 @@ def main(pattern, data_representation, procedure, num_epochs, XZ_num_epochs, bat
 
     # ------------------------------------------------------
     # Build pattern
-    #learning_rate = 0.003
-    learning_rate = 0.00003
+    learning_rate = 0.003
+    #learning_rate = 0.00003
     momentum = 0.5
     loss_weights = {'target_weight': 0.5, 'side_weight': 0.5}  # default to uniform weighting
     if pattern == "direct":
@@ -263,15 +263,22 @@ def main(pattern, data_representation, procedure, num_epochs, XZ_num_epochs, bat
                                                num_epochs=num_epochs,
                                                batch_size=batch_size,
                                                XZ_num_epochs=XZ_num_epochs,
+                                               XYpsi_num_epochs=50,
                                                update_momentum=momentum,
-                                               update_learning_rate=100*learning_rate,
+                                               update_learning_rate=learning_rate/20,
                                                XZ_update_learning_rate=learning_rate,
                                                XZ_update_momentum=momentum,
                                                target_weight=loss_weights['target_weight'],
                                                side_weight=loss_weights['side_weight'],
                                                save_params=True)
     print("Starting training...")
-    trainer.fit_XZ_XY(X_train, [C_train], X_sup, y_sup, X_val=X_test, y_val=y_test, verbose=True)
+    try:
+        trainer.fit_XZ_XY(X_train, [C_train], X_sup, y_sup, X_val=X_test, y_val=y_test, verbose=True)
+    except KeyboardInterrupt:                    
+      print (" -- learning aborted")
+    except Exception, e:                    
+      print (" -- learning failed")
+      print (e)
 
     print("=================")
     print("Test score...")
@@ -293,7 +300,7 @@ if __name__ == '__main__':
                         choices=['decoupled', 'pretrain_finetune', 'simultaneous'])
     parser.add_argument("--num_epochs", type=int, help="number of epochs for SGD", default=500, required=False)
     parser.add_argument("--XZ_num_epochs", type=int, help="number of epochs for SGD "
-        "XZ-phase (decoupled and pretrain_finetune only) ", default=100, required=False)
+        "XZ-phase (decoupled and pretrain_finetune only) ", default=500, required=False)
     parser.add_argument("--batch_size", type=int, help="batch size for SGD", default=20, required=False)
     args = parser.parse_args()
 
