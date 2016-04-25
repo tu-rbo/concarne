@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
+from __future__ import absolute_import
 
 from .iterators import AlignedBatchIterator
-from .utils import all_elements_equal_len, isiterable
+from .utils import all_elements_equal_len, isiterable, generate_timestamp
 
 import lasagne
+
 import theano
 import theano.tensor as T
 
-import datetime
 import time
 import copy
 
@@ -193,7 +194,7 @@ class PatternTrainer(object):
                         
         self.save_params = save_params
         if self.save_params:
-            ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+            ts = utils.generate_timestamp()
             self._dump_filename = "pt_%s" % ts
 
         # deprecation warnings
