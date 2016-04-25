@@ -44,8 +44,8 @@ class TestMultivariateDenseBase(object):
         l2 = lasagne.layers.DenseLayer(self.l_in, 2, nonlinearity=lasagne.nonlinearities.softmax)
 
         res2 = l2.get_output_for(self.X)
-#         print res2
-#         print res2.shape
+#          print res2
+#          print res2.shape
 
 #         loss2 = lasagne.objectives.categorical_crossentropy(
 #             lasagne.layers.get_output(l2, self.input_var),
@@ -78,7 +78,7 @@ class TestMultivariateDenseBase(object):
     def test_multivariate_categorical_crossentropy(self):
         l = self.network
         
-        prediction = lasagne.layers.get_output(l, self.input_var)
+        prediction = lasagne.layers.get_output(l, self.input_var, deterministic=True)
         argmax_prediction = [T.argmax(p, axis=1) for p in prediction]
     
         loss = concarne.lasagne.multivariate_categorical_crossentropy(
@@ -106,15 +106,20 @@ class TestMultivariateDenseBase(object):
                 loss.mean(), params, learning_rate=0.01, momentum=0.9)
         train_fn = theano.function([self.input_var, self.target_var], [loss] + argmax_prediction, updates=updates)
     
-        for i in range(100):
+        for i in range(200):
             #print ("epoch %d" % i)
             res = train_fn(self.X, self.Y)
             #print (res)
 
 #         print np.vstack([res[-2], res[-1]])
 #         print ( self.Y.T)
+        #assert (np.all(np.vstack([res[-2], res[-1]]) == self.Y.T))
     
-        assert (np.all(np.vstack([res[-2], res[-1]]) == self.Y.T))
+        err_fn = theano.function([self.input_var, self.target_var],
+              T.mean([ T.eq(T.argmax(p, axis=1), self.target_var[:,i])
+                       for (i, p) in enumerate(prediction)], dtype=theano.config.floatX))
+        assert(err_fn(self.X, self.Y) == 1.)
+   
         
 if __name__ == "__main__":
     t = TestMultivariateDenseBase()

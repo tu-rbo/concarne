@@ -8,6 +8,8 @@ from .utils import all_elements_equal_len, isiterable, generate_timestamp
 
 import lasagne
 
+import concarne.lasagne
+
 import theano
 import theano.tensor as T
 
@@ -302,6 +304,10 @@ class PatternTrainer(object):
         # Create an expression for the classification accuracy
         if self.test_objective == lasagne.objectives.categorical_crossentropy:
             test_acc = self.__softmax_argmax(test_prediction, target_var)
+        elif self.test_objective == concarne.lasagne.categorical_crossentropy:
+            test_acc = T.mean(
+              [ T.eq(T.argmax(p, axis=1), target[:,i]) for (i, p) in enumerate(prediction)]
+              , dtype=theano.config.floatX)
         else: 
             test_acc = None
     

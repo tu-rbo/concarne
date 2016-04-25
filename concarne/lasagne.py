@@ -125,7 +125,7 @@ class MultivariateDenseLayer(lasagne.layers.Layer):
                 activation = activation + b.dimshuffle('x', 0)
             outputs.append(self.nonlinearity(activation))
         
-        #return T.stack(outputs, axis=1)
+        #return T.concatenate(outputs, axis=1)
         return outputs
 
 # ------------------------------
