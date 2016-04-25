@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 try:
     install_instr = """
 Please make sure you install a recent enough version of Theano and lasagne. 
@@ -10,7 +12,4 @@ else:
     del install_instr
     del lasagne
 
-
-#from . import nonlinearities
-
-__version__ = "0.2.2dev2"
+__version__ = "0.2.2dev3"
