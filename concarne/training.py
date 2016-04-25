@@ -196,7 +196,7 @@ class PatternTrainer(object):
                         
         self.save_params = save_params
         if self.save_params:
-            ts = utils.generate_timestamp()
+            ts = generate_timestamp()
             self._dump_filename = "pt_%s" % ts
 
         # deprecation warnings
