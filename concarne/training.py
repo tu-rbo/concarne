@@ -138,7 +138,8 @@ class PatternTrainer(object):
                  XYpsi_num_epochs=None,
                  target_weight=None, 
                  side_weight=None,
-                 test_objective=lasagne.objectives.categorical_crossentropy,
+#                  test_objective=lasagne.objectives.categorical_crossentropy,
+#                  side_test_objective=None,
                  verbose=None,
                  save_params=False,
                  **kwargs):
@@ -296,15 +297,19 @@ class PatternTrainer(object):
         return train_fn
 
     def _compile_val_fn(self):
-        input_var = self.pattern.input_var
-        target_var = self.pattern.target_var
+        return self.__compile_val_fn(self.pattern.input_var, self.pattern.target_var,
+            lasagne.layers.get_output(self.pattern, deterministic=True),
+            self.test_objective)
         
-        test_prediction = lasagne.layers.get_output(self.pattern, deterministic=True)
-        test_loss = self.test_objective(test_prediction, target_var).mean()
+    def __compile_val_fn(self, input_var, target_var, 
+            test_prediction,
+            test_objective):
+        
+        test_loss = test_objective(test_prediction, target_var).mean()
         # Create an expression for the classification accuracy
-        if self.test_objective == lasagne.objectives.categorical_crossentropy:
+        if test_objective == lasagne.objectives.categorical_crossentropy:
             test_acc = self.__softmax_argmax(test_prediction, target_var)
-        elif self.test_objective == concarne.lasagne.categorical_crossentropy:
+        elif test_objective == concarne.lasagne.categorical_crossentropy:
             test_acc = T.mean(
               [ T.eq(T.argmax(p, axis=1), target[:,i]) for (i, p) in enumerate(prediction)]
               , dtype=theano.config.floatX)
@@ -693,4 +698,4 @@ class PatternTrainer(object):
                 test_acc / test_batches * 100))                
 
         return test_err/test_batches, test_acc/test_batches
-        
+
