@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 """
 A set of helpers to use nolearn.lasagne functionality.
 
