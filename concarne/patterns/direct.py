@@ -30,6 +30,16 @@ class DirectPattern(Pattern):
     def default_side_objective(self):
         return lasagne.objectives.squared_error
 
+    @property
+    def validation_side_input_vars(self):
+        return (self.input_var, )
+        
+    @property
+    def validation_side_target_var(self):
+        return self.side_var
+
+    def get_beta_output_for(self, input=None, **kwargs):
+        return self.get_phi_output_for(input=input, **kwargs)
   
     def __init__(self, **kwargs):
         assert('beta' not in kwargs)

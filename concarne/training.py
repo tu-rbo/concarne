@@ -9,7 +9,8 @@ from .utils import all_elements_equal_len, isiterable, generate_timestamp
 import lasagne
 
 import concarne.lasagne
-from concarne.lasagne import score_categorical_crossentropy
+from concarne.lasagne import score_categorical_crossentropy,\
+    score_multivariate_categorical_crossentropy
 
 import theano
 import theano.tensor as T
@@ -29,41 +30,52 @@ class PatternTrainer(object):
        It is similar to :class:`lasagne.layers.Layer` and mimics some of 
        its functionality, but does not inherit from it.
        
-       Example with aligned data X_train, y_train and Z_train::
+       Example with aligned data X_train, y_train and Z_train (e.g. multitask)::
        
         > pt = concarne.training.PatternTrainer(pattern, 
-                     num_epochs=5, batch_size=50, 
+                     num_epochs=3, batch_size=50, 
                      update_learning_rate=0.0001,
-                     target_weight=0.9, side_weight=0.1, verbose=True)
-        > pt.fit_XYZ(X_train, y_train, Z_train, X_val=X_val, y_val=y_val)
+                     target_weight=0.9, side_weight=0.1)
+        > pt.fit_XYZ(X_train, y_train, Z_train, X_val=X_val, y_val=y_val,
+                side_val=[X_val, Z_val], verbose=True)
             Training procedure: simultaneous
              Optimize phi & psi & beta using a weighted sum of target and side objective
                -> standard mode with single training function
             Starting training...
-            Epoch 1 of 5 took 0.055s
-              training loss:                0.057648
-              validation loss:              0.043710
-              validation accuracy:          97.80 %
-            Epoch 2 of 5 took 0.003s
-              training loss:                0.057491
-              validation loss:              0.043822
-              validation accuracy:          97.80 %
-            Epoch 3 of 5 took 0.003s
-              training loss:                0.057657
-              validation loss:              0.043654
-              validation accuracy:          97.80 %
-            Epoch 4 of 5 took 0.003s
-              training loss:                0.057670
-              validation loss:              0.043589
-              validation accuracy:          97.80 %
-            Epoch 5 of 5 took 0.003s
-              training loss:                0.057997
-              validation loss:              0.043635
-              validation accuracy:          97.80 % 
+            Optimize phi & psi & beta using a weighted sum of target and side objective
+             Update: nesterov_momentum(learning_rate=0.0001, momentum=0.9) 
+               -> standard mode with single training function
+            Starting training...
+            Epoch 1 of 3 took 0.010s
+              training loss:                15.220120
+               (target: 10.156144,  side: 60.795899 (absolute))
+              validation loss:              6.142665
+              validation accuracy:          52.20 %
+              side validation loss:         348.806490
+              side validation accuracy:     21.40 %
+            Epoch 2 of 3 took 0.008s
+              training loss:                10.727928
+               (target: 4.670905,  side: 65.241137 (absolute))
+              validation loss:              6.281717
+              validation accuracy:          47.80 %
+              side validation loss:         331.070974
+              side validation accuracy:     25.10 %
+            Epoch 3 of 3 took 0.008s
+              training loss:                9.908304
+               (target: 3.530447,  side: 67.309020 (absolute))
+              validation loss:              6.379712
+              validation accuracy:          43.80 %
+              side validation loss:         313.270051
+              side validation accuracy:     24.80 %
+            Storing pattern to pt_2016-04-27_22-01-22-142855_simultaneous
        > loss, acc = pt.score(X_test, y_test, verbose=True)
             Score:
-              loss:                 0.088877
-              accuracy:             97.21 %            
+              loss:                 4.284542
+              accuracy:             31.21 %            
+       > side_loss, side_acc = pt.score_side(X_test, Z_test, verbose=True)
+            Score for side loss:
+              loss:                 285.109184
+              accuracy:             16.21 %            
 
        If in your task, you have more (or simply a different amount of)
        side information available than labels, you can use the method 
@@ -200,6 +212,7 @@ class PatternTrainer(object):
 
         self.side_val_fn = None
         self.side_val_batch_iterator = None
+        self._side_val_fn_not_supported = False
                         
         self.save_params = save_params
         if self.save_params:
@@ -296,6 +309,9 @@ class PatternTrainer(object):
 
         # finally: build theano training function
         train_fn = theano.function(train_fn_inputs, outputs, updates=updates)
+        
+        # FIXME
+        self._train_fn_no_update = theano.function(train_fn_inputs, outputs)
     
         return train_fn
 
@@ -308,9 +324,15 @@ class PatternTrainer(object):
         input_vars = self.pattern.validation_side_input_vars
         target_var = self.pattern.validation_side_target_var
 
-        return self.__compile_val_fn(input_vars, target_var,
-            self.pattern.get_beta_output_for(deterministic=True),
-            self.side_test_objective)
+        if target_var is not None:
+            return self.__compile_val_fn(input_vars, target_var,
+                self.pattern.get_beta_output_for(deterministic=True),
+                self.side_test_objective)
+
+        else:
+            _, _, side_loss = self.pattern.training_loss(all_losses=True)
+            return theano.function(input_vars, [side_loss.mean()])
+
         
     def __compile_val_fn(self, input_vars, target_var, 
             test_prediction,
@@ -350,7 +372,7 @@ class PatternTrainer(object):
     def fit_XYZ(self, X, Y, Zs,
             batch_iterator=None, 
             X_val=None, y_val=None,
-            Zs_val=None,
+            side_val=None,
             verbose=False):
         """Training function for aligned data (same number of examples for
        X, Y and Z)
@@ -370,9 +392,8 @@ class PatternTrainer(object):
             Validation input data
         y_val: numpy array, optional
             Validation labeled data
-        Zs_val: numpy array, optional
+        side_val: list of numpy arrays, optional
             Validation data for side information 
-            (useful in predictive patterns, e.g. multi-task)
         verbose: bool / int
             Verbosity level (default 0/False)
         """
@@ -398,7 +419,7 @@ class PatternTrainer(object):
             raise Exception("X, Y and Z must have same len!")
 
         return self._fit(batch_iterators, [batch_iterator_args]*2, 
-                         "XYZ", X_val, y_val, Zs_val, verbose)
+                         "XYZ", X_val, y_val, side_val, verbose)
 
 
         
@@ -406,7 +427,7 @@ class PatternTrainer(object):
             batch_iterator_XZ=None,
             batch_iterator_XY=None, 
             X_val=None, y_val=None,
-            Zs_val=None,
+            side_val=None,
             verbose=False):
         """Training function for unaligned data (one data set for X and Z,
            another data set for X and Y)
@@ -432,7 +453,7 @@ class PatternTrainer(object):
             Validation input data
         y_val: numpy array, optional
             Validation labeled data
-        Zs_val: numpy array, optional
+        side_val: list of numpy arrays, optional
             Validation data for side information 
             (useful in predictive patterns, e.g. multi-task)
         verbose: bool / int
@@ -460,7 +481,7 @@ class PatternTrainer(object):
             raise Exception("X2 and Y must have same len!")
             
         return self._fit(batch_iterators, batch_iterator_args_lst, 
-                         "XZ_XY", X_val, y_val, Zs_val, verbose)
+                         "XZ_XY", X_val, y_val, side_val, verbose)
 
     def __update_info(self, update, update_params):
         return ("Update: %s(%s) " % (update.__name__,
@@ -468,22 +489,22 @@ class PatternTrainer(object):
 
         
     def _fit(self, batch_iterators, batch_iterator_args_lst, data_alignment="XYZ", 
-                X_val=None, y_val=None, Zs_val=None, verbose=False,):
+                X_val=None, y_val=None, side_val=None, verbose=False,):
 
         assert (data_alignment in ["XYZ", "XZ_XY"])
 
-        if Zs_val is not None:
-            # FIXME
-            warn("Zs_val not yet supported; ignoring")
-            Zs_val = None
+#         if side_val is not None:
+#             # FIXME
+#             warn("side_val not yet supported; ignoring")
+#             side_val = None
 
         # check length of validation args
         if X_val is not None:
             val_args = [X_val, y_val]
-            if Zs_val is not None:
-                val_args += Zs_val
+#             if side_val is not None:
+#                 val_args += Zs_val
             if not all_elements_equal_len(val_args):
-                raise Exception("X_val, Y_val and Zs_val must have same len!")
+                raise Exception("X_val and Y_val must have same len!")
                             
         #if X_val is not None and y_val is not None:
         #    assert (len(X_val) == len(y_val))
@@ -519,7 +540,8 @@ class PatternTrainer(object):
                                               update=self.XZ_update,
                                               **update_params_XZ)
             # passing X_val and y_val doesn't make sense because psi is not trained
-            self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]], self.XZ_num_epochs, verbose=verbose)
+            self._train([train_fn], [batch_iterators[0]], [batch_iterator_args_lst[0]], self.XZ_num_epochs, 
+                        side_val=side_val, verbose=verbose)
             
             if self.save_params:
                 df = self._dump_filename + "_" + self.procedure + "_phase1"
@@ -538,7 +560,8 @@ class PatternTrainer(object):
                                                   tags= {'phi': False, 'beta': False },  # beta: False is implicit
                                                   update=self.update,
                                                   **update_params)
-                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], self.num_epochs, X_val, y_val, verbose)
+                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], self.num_epochs, 
+                        X_val=X_val, y_val=y_val, verbose=verbose)
                 
             elif self.procedure == 'pretrain_finetune':
                 # intermediate training phase - train psi only, keeping phi fixed
@@ -551,7 +574,8 @@ class PatternTrainer(object):
                                                       tags= {'psi': True}, 
                                                       update=self.XZ_update,
                                                       **update_params_XZ)
-                    self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], self.XYpsi_num_epochs, X_val, y_val, verbose)
+                    self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], self.XYpsi_num_epochs, 
+                        X_val=X_val, y_val=y_val, verbose=verbose)
 
                     if self.save_params:
                         df = self._dump_filename + "_" + self.procedure + "_phase2_psionly"
@@ -567,7 +591,8 @@ class PatternTrainer(object):
                                                   tags= {'beta': False}, 
                                                   update=self.XZ_update,
                                                   **update_params_XZ)
-                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], self.num_epochs, X_val, y_val, verbose)
+                self._train([train_fn], [batch_iterators[1]], [batch_iterator_args_lst[1]], self.num_epochs, 
+                    X_val=X_val, y_val=y_val, side_val=side_val, verbose=verbose)
 
             if self.save_params:
                 df = self._dump_filename + "_" + self.procedure + "_phase2"
@@ -608,7 +633,8 @@ class PatternTrainer(object):
 
                 train_fn = [train_fn1, train_fn2]
                 
-            self._train(train_fn, batch_iterators, batch_iterator_args_lst, self.num_epochs, X_val, y_val, verbose=verbose)
+            self._train(train_fn, batch_iterators, batch_iterator_args_lst, self.num_epochs, 
+                    X_val=X_val, y_val=y_val, side_val=side_val, verbose=verbose)
 
             if self.save_params:
                 df = self._dump_filename + "_" + self.procedure
@@ -618,10 +644,19 @@ class PatternTrainer(object):
         
         return self
 
-    def _train(self, train_fns, batch_iterators, batch_iterator_args_lst, num_epochs, X_val=None, y_val=None, verbose=False):
+    def _train(self, train_fns, batch_iterators, batch_iterator_args_lst, num_epochs, 
+                X_val=None, y_val=None, side_val=None, verbose=False):
 
         if self.val_fn is None:
             self.val_fn = self._compile_val_fn()
+        
+        if side_val is not None and self.side_val_fn is None and not self._side_val_fn_not_supported:
+            try:
+                self.side_val_fn = self._compile_side_val_fn()
+            except NotImplementedError, e:
+                warn("The pattern does not support score_side %s" % e)
+                self._side_val_fn_not_supported = True
+                side_val = None
         
         if not isiterable(train_fns):
             train_fns = [train_fns]
@@ -629,6 +664,8 @@ class PatternTrainer(object):
             batch_iterators = [batch_iterators]
         if not isiterable(batch_iterator_args_lst):
             batch_iterator_args_lst = [batch_iterator_args_lst]
+        
+        no_unique_train_fn = len(set(train_fns))
         
         if verbose:
             print("Starting training...")
@@ -645,31 +682,47 @@ class PatternTrainer(object):
                 in zip(train_fns, batch_iterators, batch_iterator_args_lst):
                 for batch in batch_iterator(*batch_iterator_args):
                     outputs = train_fn(*batch)
+                    #outputs = self._train_fn_no_update(*batch) # for testing
                     train_err += outputs['loss']
                     train_batches += 1
                     if 'target_loss' in outputs:
                         train_target_err += outputs['target_loss']
                     if 'side_loss' in outputs:
                         train_side_err += outputs['side_loss']
-            train_batches /= len(train_fns)
+            
+            # normalize by number of training functions                        
+            train_batches /= no_unique_train_fn
+
 
             # And a pass over the validation data:
             if X_val is not None and y_val is not None:
-                #bs = len(X_val)
                 bs = batch_iterators[-1].batch_size
                 val_err, val_acc = self.score(X_val, y_val, batch_size=bs)
+                #print (self.score(batch_iterator_args[0], batch_iterator_args[1], batch_size=bs))
+    
+            if side_val is not None:
+                side_val_err, side_val_acc = self.score_side(side_val)
     
             # Then we print the results for this epoch:
             if verbose:
+                if len(self.loss_weights) > 0:
+                    # normalize wrt weights
+                    train_target_err /= self.loss_weights['target_weight']
+                    train_side_err /= self.loss_weights['side_weight']
+            
                 print("Epoch {} of {} took {:.3f}s".format(
                     epoch + 1, num_epochs, time.time() - start_time))
                 print("  training loss:\t\t{:.6f}".format(train_err / train_batches))
                 print("   (target: {:.6f}, ".format(train_target_err / train_batches)
-                     + " side: {:.6f})".format(train_side_err / train_batches))
-                    
+                     + " side: {:.6f}".format(train_side_err / train_batches) + " (absolute))")
+    
                 if X_val is not None and y_val is not None:
                     print("  validation loss:\t\t{:.6f}".format(val_err))
                     print("  validation accuracy:\t\t{:.2f} %".format(val_acc * 100))
+
+                if side_val is not None:
+                    print("  side validation loss:\t\t{:.6f}".format(side_val_err))
+                    print("  side validation accuracy:\t{:.2f} %".format(side_val_acc * 100))
                                         
     def score(self, X, y, batch_size=None, verbose=False):
         """
@@ -708,7 +761,7 @@ class PatternTrainer(object):
                 err, acc = res
             else:
                 err = res
-                acc = 0
+                acc = np.nan
             test_err += err
             test_acc += acc
             test_batches += 1
@@ -741,8 +794,8 @@ class PatternTrainer(object):
         try:
             if self.side_val_fn is None:
                 self.side_val_fn = self._compile_side_val_fn()
-        except NotImplemented, e:
-            print ("The pattern does not support score_side: %s" % e)
+        except NotImplementedError, e:
+            warn("The pattern does not support score_side %s" % e)
             return None
         
         if not isiterable(inputs):
@@ -771,7 +824,7 @@ class PatternTrainer(object):
                     err = res[0]
                 else:
                     err = res
-                acc = 0
+                acc = np.nan
             test_err += err
             test_acc += acc
             test_batches += 1
@@ -781,7 +834,7 @@ class PatternTrainer(object):
             print("  loss:\t\t\t{:.6f}".format(test_err / test_batches))
             # TODO do not print this if side_val_fn does not return accuracy
             print("  accuracy:\t\t{:.2f} %".format(
-                test_acc / test_batches * 100))                
+                (test_acc / test_batches) * 100))                
 
         return test_err/test_batches, test_acc/test_batches
         

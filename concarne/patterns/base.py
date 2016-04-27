@@ -24,6 +24,27 @@ class Pattern(object):
 
     It is similar to :class:`lasagne.layers.Layer` and mimics some of 
     its functionality, but does not inherit from it.
+    
+    === How to implement your own pattern? ===
+    The minimal example should implement the following functions:
+
+    - get_side_objective
+    - default_target_objective
+    - default_side_objective
+    - default_beta_input
+    - default_beta_output_shape
+
+    Depending on the pattern, you might need to override (usually if you need 
+    additional side variables):
+    - training_input_vars
+    - side_vars 
+
+    If you beta has multiple inputs, you will need to implement:
+    - get_beta_output_for
+
+    Optionally, you might want to implement in order to use :method:`Pattern.score_side`:
+    - validation_side_input_vars(self):
+    - validation_side_target_var(self)
 
     Parameters
     ----------
@@ -152,7 +173,7 @@ class Pattern(object):
         
         Must be implemented by each pattern.
         """
-        raise NotImplemented()       
+        raise NotImplementedError()       
                 
     @property
     def training_input_vars(self):
@@ -172,22 +193,45 @@ class Pattern(object):
 
     @property
     def validation_side_input_vars(self):
-        """Return the theano variables that are required for validating
-           the side information.
-            
-           This strongly depends on the pattern.
-            
+        """Return the theano input variables for validating the side loss.
+
            Order matters!
+            
+           This strongly depends on the pattern and is therefore implemented
+           individually. 
+           
+           It is not obligatory, but you will not be able to compute the side validation
+           loss.
+
+           Also see :method:`Pattern.validation_target_var`
             
            Returns
            -------
            tuple of theano tensor variables
         """
-        raise NotImplemented()
+        raise NotImplementedError()
 
     @property
-    def validation_side_target_var(self):
-        raise NotImplemented()
+    def validation_target_var(self):
+        """Return the theano target variable required for validating
+           the side information (optional).
+
+           This returns None per default. Override it the side loss of the pattern is a not a 
+           supervised loss. 
+            
+           This strongly depends on the pattern and is therefore implemented
+           individually. 
+           
+           It is not obligatory, but you will not be able to compute the side validation
+           loss during training.
+
+           Also see :method:`Pattern.validation_input_vars`
+            
+           Returns
+           -------
+           theano tensor variable
+        """
+        return None
 
                     
     @property
@@ -219,7 +263,7 @@ class Pattern(object):
             -------
             theano expression
         """
-        raise NotImplemented()
+        raise NotImplementedError()
   
   
     @property  
@@ -234,7 +278,7 @@ class Pattern(object):
             -------
             theano expression
         """
-        raise NotImplemented()
+        raise NotImplementedError()
   
   
     @property  
@@ -292,7 +336,7 @@ class Pattern(object):
             Returns:            
             tuple of lasagne layer class and dictionary, or lasagne layer instance
         """
-        raise NotImplemented()
+        raise NotImplementedError()
         
 
     @property  
@@ -307,7 +351,7 @@ class Pattern(object):
         Returns:       
         int or tuple of ints
         """
-        raise NotImplemented()
+        raise NotImplementedError()
                                 
 
     def _get_all_function_layers(self, fun):

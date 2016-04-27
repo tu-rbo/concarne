@@ -69,14 +69,14 @@ def load_dataset(tr_data, tr_data_url, test_data, test_data_url):
 
     X_valid = np.cast['float32'](npz_train['X_valid'])
     Y_valid = np.cast['int32'](npz_train['Y_valid'])
-    #C_valid = npz_train['C_valid']
+    C_valid = np.cast['float32'](npz_train['C_valid'])
 
     X_test = np.cast['float32'](npz_test['X_test'])
     Y_test = np.cast['int32'](npz_test['Y_test'])
-    #C_test = npz_train['C_test']
+    C_test = None #np.cast['float32'](npz_train['C_test'])
     
     return (npz_train, npz_test),\
-      (X, Y, C, X_valid, Y_valid, X_test, Y_test)
+      (X, Y, C, X_valid, Y_valid, C_valid, X_test, Y_test, C_test)
     
 def load_direct_side_dataset():
     tr_data = "cl_synth_direct_d-50_e-0_n-500_seed-12340.npz"
@@ -105,15 +105,18 @@ def load_relative_side_dataset():
     test_data = "cl_synth_relative_d-50_e-0_ntest-50000_seed-12340.npz"
     test_data_url = "https://owncloud.tu-berlin.de/index.php/s/KD0toz7t4ZBa5q5/download"
 
-    (_,_), (X, Y, C, X_valid, Y_valid, X_test, Y_test) \
+    (_,_), (X, Y, C, X_valid, Y_valid, C_valid, X_test, Y_test, C_test) \
        = load_dataset(tr_data, tr_data_url, test_data, test_data_url)
     
     # the side training data C contains stacked "x_j" and "y_ij" 
     # which are aligned with the x_i in matrix X
     CX = C[:, :X.shape[1]]
     CY = C[:, X.shape[1]:]
+
+    CX_valid = C_valid[:, :X.shape[1]]
+    CY_valid = C_valid[:, X.shape[1]:]
     
-    return X, Y, CX, CY, X_valid, Y_valid, X_test, Y_test
+    return X, Y, CX, CY, X_valid, Y_valid, CX_valid, CY_valid, X_test, Y_test
 
 
 # ############################# Helper functions #################################
@@ -338,11 +341,11 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
     # Load data and build pattern
     if data == "direct":
         print("Loading direct data...")
-        X_train, y_train, C_train, X_val, y_val, X_test, y_test = load_direct_side_dataset()
+        X_train, y_train, C_train, X_val, y_val, C_val, X_test, y_test, C_test = load_direct_side_dataset()
     
     if data == "embedding":    
         print("Loading embedding data...")
-        X_train, y_train, C_train, X_val, y_val, X_test, y_test = load_embedding_side_dataset()
+        X_train, y_train, C_train, X_val, y_val, C_val, X_test, y_test, C_test = load_embedding_side_dataset()
     
     if data == "direct" or data == "embedding":
         # input dimension of X
@@ -359,7 +362,6 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
           if procedure != "simultaneous":
             learning_rate*=0.1
           loss_weights = {} #'target_weight':0.5, 'side_weight':0.5}
-          score_side_args = None
 
         elif pattern_type == "multitask":
           pattern = build_multitask_pattern(input_var, target_var, side_var, n, m, d, num_classes)
@@ -367,7 +369,6 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
           if procedure != "simultaneous":
             learning_rate*=0.1
           loss_weights = {'target_weight':0.9, 'side_weight':0.1}
-          score_side_args = [X_train, C_train]
 
         elif pattern_type == "multiview":
           pattern = build_multiview_pattern(input_var, target_var, side_var, n, m, d, num_classes)
@@ -375,15 +376,19 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
           if procedure != "simultaneous":
             learning_rate*=0.01
           loss_weights = {'target_weight':0.99, 'side_weight':0.01}
-          score_side_args = None #X_train , C_train
-          
+
         iterate_side_minibatches_args = [X_train, y_train, [C_train]]
     
+        # args for training score of side loss
+        score_side_args = [X_train, C_train]
+        # args for validation score of side loss
+        score_side_val_args = [X_val, C_val]
+          
         
     elif data == "relative":
         # Load the dataset
         print("Loading relative data...")
-        X_train, y_train, CX_train, Cy_train, X_val, y_val, X_test, y_test = load_relative_side_dataset()
+        X_train, y_train, CX_train, Cy_train, X_val, y_val, CX_val, Cy_val, X_test, y_test = load_relative_side_dataset()
 
         side_transform_var = T.matrix('side_transforms')
     
@@ -399,7 +404,11 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
         
         learning_rate=0.0001        
         loss_weights = {'target_weight':0.1, 'side_weight':0.9}
+
+        # args for training score of side loss
         score_side_args = [X_train, CX_train, Cy_train]
+        # args for validation score of side loss
+        score_side_val_args = [X_val, CX_val, Cy_val]
         
     # ------------------------------------------------------
     # Instantiate pattern trainer
@@ -418,17 +427,18 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
     print("Starting training...")
     trainer.fit_XYZ(*iterate_side_minibatches_args, 
                     X_val=X_val, y_val=y_val,
+                    side_val=score_side_val_args,
                     verbose=True)
 
     print("=================")
     print("Test score...")
     trainer.score(X_test, y_test, verbose=True)
 
-    if score_side_args is not None:
-#         try:
-            trainer.score_side(score_side_args, verbose=True)
-#         except Exception,e:
-#             print (e)
+    if score_side_val_args is not None:
+         try:
+            trainer.score_side(score_side_val_args, verbose=True)
+         except Exception,e:
+             print (e)
         
     return trainer
         
