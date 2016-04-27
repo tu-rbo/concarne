@@ -13,6 +13,8 @@ import concarne.lasagne
 import theano
 import theano.tensor as T
 
+import numpy as np
+
 import time
 import copy
 
@@ -194,6 +196,9 @@ class PatternTrainer(object):
         
         self.val_fn = None
         self.val_batch_iterator = None
+
+        self.side_val_fn = None
+        self.side_val_batch_iterator = None
                         
         self.save_params = save_params
         if self.save_params:
@@ -300,6 +305,14 @@ class PatternTrainer(object):
         return self.__compile_val_fn(self.pattern.input_var, self.pattern.target_var,
             lasagne.layers.get_output(self.pattern, deterministic=True),
             self.test_objective)
+
+    def _compile_side_val_fn(self, target_var=None):
+        if target_var is None:
+            # assume default:
+            target_var = self.pattern.side_var
+        return self.__compile_val_fn(self.pattern.input_var, target_var,
+            self.pattern.get_beta_output_for(deterministic=True),
+            self.side_test_objective)
         
     def __compile_val_fn(self, input_var, target_var, 
             test_prediction,
@@ -309,9 +322,9 @@ class PatternTrainer(object):
         # Create an expression for the classification accuracy
         if test_objective == lasagne.objectives.categorical_crossentropy:
             test_acc = self.__softmax_argmax(test_prediction, target_var)
-        elif test_objective == concarne.lasagne.categorical_crossentropy:
+        elif test_objective == concarne.lasagne.multivariate_categorical_crossentropy:
             test_acc = T.mean(
-              [ T.eq(T.argmax(p, axis=1), target[:,i]) for (i, p) in enumerate(prediction)]
+              [ T.eq(T.argmax(p, axis=1), target_var[:,i]) for (i, p) in enumerate(test_prediction)]
               , dtype=theano.config.floatX)
         else: 
             test_acc = None
@@ -319,6 +332,9 @@ class PatternTrainer(object):
         outputs = [test_loss]
         if test_acc is not None:
             outputs.append(test_acc)
+    
+        # FIXME
+        #outputs.append(test_objective(test_prediction, target_var))
     
         # Compile a second function computing the validation loss and accuracy:
         val_fn = theano.function([input_var, target_var], outputs)
@@ -656,7 +672,7 @@ class PatternTrainer(object):
         X :  numpy array
             Input data (rows: samples, cols: features)
         y :  numpy array
-            Input data (rows: samples, cols: features)
+            Target labels
         batch_size: int, optional
             batch size for score
         verbose: string, optional
@@ -694,8 +710,68 @@ class PatternTrainer(object):
         if test_batches > 0 and verbose:
             print("Score:")
             print("  loss:\t\t\t{:.6f}".format(test_err / test_batches))
+            # TODO do not print this if val_fn does not return accuracy
             print("  accuracy:\t\t{:.2f} %".format(
                 test_acc / test_batches * 100))                
 
         return test_err/test_batches, test_acc/test_batches
 
+        
+    def score_side(self, ZX, Zy, target_var=None, batch_size=None, verbose=False):
+        """
+        Experimental: compute the side score
+        
+        Parameters
+        ----------       
+        ZX :  numpy array
+            Input data (rows: samples, cols: features)
+        Zy :  numpy array
+            Target labels
+        batch_size: int, optional
+            batch size for score
+        verbose: string, optional
+            whether to print results of score (default: false)
+        """
+        
+        if self.side_val_fn is None:
+            self.side_val_fn = self._compile_side_val_fn(target_var)
+        
+        assert (len(ZX) == len(Zy))
+        
+        if batch_size is None:
+            batch_size = len(ZX)
+        
+        # simple iterator for valid/test error
+        if self.side_val_batch_iterator is None or self.side_val_batch_iterator.batch_size != batch_size:
+            self.side_val_batch_iterator = AlignedBatchIterator(batch_size, shuffle=False)
+        
+        # After training, we compute and print the test error:
+        test_err = 0
+        test_acc = 0
+        test_batches = 0
+        for batch in self.side_val_batch_iterator(ZX, Zy):
+            inputs, targets = batch
+            res = self.side_val_fn(inputs, targets)
+            if len(res) == 2:
+                err, acc = res
+            else:
+                assert (len(res) == 1)
+                if isiterable(res[0]):
+                    assert (len(res) == 1)
+                    err = res[0]
+                else:
+                    err = res
+                acc = 0
+            test_err += err
+            test_acc += acc
+            test_batches += 1
+    
+        if test_batches > 0 and verbose:
+            print("Score for side:")
+            print("  loss:\t\t\t{:.6f}".format(test_err / test_batches))
+            # TODO do not print this if side_val_fn does not return accuracy
+            print("  accuracy:\t\t{:.2f} %".format(
+                test_acc / test_batches * 100))                
+
+        return test_err/test_batches, test_acc/test_batches
+        

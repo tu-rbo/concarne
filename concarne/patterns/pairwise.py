@@ -155,7 +155,11 @@ class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
     def default_beta_output_shape(self):
         return self.side_transform_shape
         
-    def get_beta_output_for(self, input_i, input_j, **kwargs):        
+    def get_beta_output_for(self, input_i=None, input_j=None, **kwargs):        
+        if input_i is None:
+            input_i = self.input_var
+        if input_j is None:
+            input_j = self.side_var
         phi_i_output = lasagne.layers.get_output(self.phi, input_i, **kwargs)
         phi_j_output = lasagne.layers.get_output(self.phi, input_j, **kwargs)
         

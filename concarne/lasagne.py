@@ -166,3 +166,21 @@ def multivariate_categorical_crossentropy(predictions, targets):
     for i, pred in enumerate(predictions):
         losses += theano.tensor.nnet.categorical_crossentropy(pred, targets[:,i])
     return losses
+
+def softmax_multivariate_categorical_crossentropy(predictions):
+    return [T.argmax(p, axis=1) for (i, p) in enumerate(predictions)]
+
+def score_multivariate_categorical_crossentropy(predictions, target):
+    """
+        import theano
+        import theano.tensor as T
+        inputs = T.matrix("inputs")
+        targets = T.imatrix("targets")
+        network = ...
+        prediction = lasagne.layers.get_output(network, deterministic=True)
+        
+        score_fn = theano.function([inputs, targets], score_multivariate_categorical_crossentropy(prediction, targets))
+    """
+    return T.mean([ T.eq(T.argmax(p, axis=1), target[:,i])
+           for (i, p) in enumerate(predictions)], dtype=theano.config.floatX)
+
