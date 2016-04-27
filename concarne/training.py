@@ -340,18 +340,10 @@ class PatternTrainer(object):
         # Compile a second function computing the validation loss and accuracy:
         inputs = input_vars + [target_var]
         
-        # FIXME
-        print (target_var.name)
-        #if target_var.name!="sideinfo":
         val_fn = theano.function(inputs, outputs)
-#         else:
-#             print ("YES")
-#             #val_fn = theano.function(inputs, test_prediction)
-#             val_fn = theano.function(self.pattern.validation_side_input_vars, 
-#                         self.pattern.get_beta_output_for())
 
-        print (inputs)
-        print (outputs)
+#         print (inputs)
+#         print (outputs)
 
         return val_fn
         
@@ -731,16 +723,15 @@ class PatternTrainer(object):
         return test_err/test_batches, test_acc/test_batches
 
         
-    def score_side(self, Zs, batch_size=None, verbose=False):
+    def score_side(self, inputs, batch_size=None, verbose=False):
         """
         Experimental: compute the side score
         
         Parameters
         ----------       
-        Zs :  numpy array
-            Input data (rows: samples, cols: features)
-        Zy :  numpy array
-            Target labels
+        inputs :  list or tuple of numpy arrays
+            All data required to compute the scores.
+            Should match the pattern.
         batch_size: int, optional
             batch size for score
         verbose: string, optional
@@ -754,11 +745,11 @@ class PatternTrainer(object):
             print ("The pattern does not support score_side: %s" % e)
             return None
         
-        if not isiterable(Zs):
-            Zs = [Zs]
+        if not isiterable(inputs):
+            inputs = [inputs]
         
         if batch_size is None:
-            batch_size = len(Zs[0])
+            batch_size = len(inputs[0])
         
         # simple iterator for valid/test error
         if self.side_val_batch_iterator is None or self.side_val_batch_iterator.batch_size != batch_size:
@@ -768,10 +759,9 @@ class PatternTrainer(object):
         test_err = 0
         test_acc = 0
         test_batches = 0
-        for batch in self.side_val_batch_iterator(*Zs):
-            inputs = batch
-            res = self.side_val_fn(*inputs)
-            #res = self.side_val_fn(inputs)
+        for batch in self.side_val_batch_iterator(*inputs):
+            res = self.side_val_fn(*batch)
+
             if len(res) == 2:
                 err, acc = res
             else:
