@@ -98,6 +98,15 @@ class PairwiseTransformationPattern(Pattern):
     def side_vars(self):
         return (self.side_var, self.side_transform_var)        
 
+    @property
+    def validation_side_input_vars(self):
+        return (self.input_var, self.side_var)
+        
+    @property
+    def validation_side_target_var(self):
+        return self.side_transform_var
+        
+
 class PairwisePredictTransformationPattern(PairwiseTransformationPattern):
     """
     The :class:`PairwisePredictTransformationPattern` is a pattern where 

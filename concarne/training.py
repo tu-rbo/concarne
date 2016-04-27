@@ -9,6 +9,7 @@ from .utils import all_elements_equal_len, isiterable, generate_timestamp
 import lasagne
 
 import concarne.lasagne
+from concarne.lasagne import score_categorical_crossentropy
 
 import theano
 import theano.tensor as T
@@ -249,9 +250,6 @@ class PatternTrainer(object):
 
         return collected
 
-    def __softmax_argmax(self, prediction, target):
-        return T.mean(T.eq(T.argmax(prediction, axis=1), target), dtype=theano.config.floatX)    
-
     def _compile_train_fn(self, train_fn_inputs, loss_weights, tags, update, **update_params):
         loss, target_loss, side_loss = self.pattern.training_loss(all_losses=True, **loss_weights)
         loss = loss.mean()
@@ -272,7 +270,7 @@ class PatternTrainer(object):
         # TODO can we give better feedback for classification case?
 #         target_var = self.pattern.target_var
 #         if self.test_objective == lasagne.objectives.categorical_crossentropy:
-#             outputs['acc'] = self.__softmax_argmax(test_prediction, target_var)
+#             outputs['acc'] = score_categorical_crossentropy(test_prediction, target_var)
 #         else: 
 #             test_acc = None
 
@@ -302,30 +300,33 @@ class PatternTrainer(object):
         return train_fn
 
     def _compile_val_fn(self):
-        return self.__compile_val_fn(self.pattern.input_var, self.pattern.target_var,
+        return self.__compile_val_fn([self.pattern.input_var], self.pattern.target_var,
             lasagne.layers.get_output(self.pattern, deterministic=True),
             self.test_objective)
 
-    def _compile_side_val_fn(self, target_var=None):
-        if target_var is None:
-            # assume default:
-            target_var = self.pattern.side_var
-        return self.__compile_val_fn(self.pattern.input_var, target_var,
+    def _compile_side_val_fn(self):
+        input_vars = self.pattern.validation_side_input_vars
+        target_var = self.pattern.validation_side_target_var
+
+        return self.__compile_val_fn(input_vars, target_var,
             self.pattern.get_beta_output_for(deterministic=True),
             self.side_test_objective)
         
-    def __compile_val_fn(self, input_var, target_var, 
+    def __compile_val_fn(self, input_vars, target_var, 
             test_prediction,
             test_objective):
+            
+        if not isiterable(input_vars):
+            input_vars = [input_vars]
+        if type(input_vars) == tuple:
+            input_vars = list(input_vars)
         
         test_loss = test_objective(test_prediction, target_var).mean()
         # Create an expression for the classification accuracy
         if test_objective == lasagne.objectives.categorical_crossentropy:
-            test_acc = self.__softmax_argmax(test_prediction, target_var)
+            test_acc = score_categorical_crossentropy(test_prediction, target_var)
         elif test_objective == concarne.lasagne.multivariate_categorical_crossentropy:
-            test_acc = T.mean(
-              [ T.eq(T.argmax(p, axis=1), target_var[:,i]) for (i, p) in enumerate(test_prediction)]
-              , dtype=theano.config.floatX)
+            test_acc = score_multivariate_categorical_crossentropy(test_prediction, target_var)
         else: 
             test_acc = None
     
@@ -337,7 +338,20 @@ class PatternTrainer(object):
         #outputs.append(test_objective(test_prediction, target_var))
     
         # Compile a second function computing the validation loss and accuracy:
-        val_fn = theano.function([input_var, target_var], outputs)
+        inputs = input_vars + [target_var]
+        
+        # FIXME
+        print (target_var.name)
+        #if target_var.name!="sideinfo":
+        val_fn = theano.function(inputs, outputs)
+#         else:
+#             print ("YES")
+#             #val_fn = theano.function(inputs, test_prediction)
+#             val_fn = theano.function(self.pattern.validation_side_input_vars, 
+#                         self.pattern.get_beta_output_for())
+
+        print (inputs)
+        print (outputs)
 
         return val_fn
         
@@ -717,13 +731,13 @@ class PatternTrainer(object):
         return test_err/test_batches, test_acc/test_batches
 
         
-    def score_side(self, ZX, Zy, target_var=None, batch_size=None, verbose=False):
+    def score_side(self, Zs, batch_size=None, verbose=False):
         """
         Experimental: compute the side score
         
         Parameters
         ----------       
-        ZX :  numpy array
+        Zs :  numpy array
             Input data (rows: samples, cols: features)
         Zy :  numpy array
             Target labels
@@ -733,13 +747,18 @@ class PatternTrainer(object):
             whether to print results of score (default: false)
         """
         
-        if self.side_val_fn is None:
-            self.side_val_fn = self._compile_side_val_fn(target_var)
+        try:
+            if self.side_val_fn is None:
+                self.side_val_fn = self._compile_side_val_fn()
+        except NotImplemented, e:
+            print ("The pattern does not support score_side: %s" % e)
+            return None
         
-        assert (len(ZX) == len(Zy))
+        if not isiterable(Zs):
+            Zs = [Zs]
         
         if batch_size is None:
-            batch_size = len(ZX)
+            batch_size = len(Zs[0])
         
         # simple iterator for valid/test error
         if self.side_val_batch_iterator is None or self.side_val_batch_iterator.batch_size != batch_size:
@@ -749,9 +768,10 @@ class PatternTrainer(object):
         test_err = 0
         test_acc = 0
         test_batches = 0
-        for batch in self.side_val_batch_iterator(ZX, Zy):
-            inputs, targets = batch
-            res = self.side_val_fn(inputs, targets)
+        for batch in self.side_val_batch_iterator(*Zs):
+            inputs = batch
+            res = self.side_val_fn(*inputs)
+            #res = self.side_val_fn(inputs)
             if len(res) == 2:
                 err, acc = res
             else:

@@ -169,7 +169,27 @@ class Pattern(object):
            tuple of theano tensor variables
         """
         return (self.input_var, self.target_var, self.side_var)
-          
+
+    @property
+    def validation_side_input_vars(self):
+        """Return the theano variables that are required for validating
+           the side information.
+            
+           This strongly depends on the pattern.
+            
+           Order matters!
+            
+           Returns
+           -------
+           tuple of theano tensor variables
+        """
+        raise NotImplemented()
+
+    @property
+    def validation_side_target_var(self):
+        raise NotImplemented()
+
+                    
     @property
     def side_vars(self):
         """Return the theano variables that are required for training.

@@ -367,7 +367,7 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
           if procedure != "simultaneous":
             learning_rate*=0.1
           loss_weights = {'target_weight':0.9, 'side_weight':0.1}
-          score_side_args = X_train, C_train
+          score_side_args = [X_train, C_train]
 
         elif pattern_type == "multiview":
           pattern = build_multiview_pattern(input_var, target_var, side_var, n, m, d, num_classes)
@@ -399,8 +399,7 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
         
         learning_rate=0.0001        
         loss_weights = {'target_weight':0.1, 'side_weight':0.9}
-        score_side_args = None
-        #score_side_args = X_train, CX_train, Cy_train 
+        score_side_args = [X_train, CX_train, Cy_train]
         
     # ------------------------------------------------------
     # Instantiate pattern trainer
@@ -426,7 +425,10 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
     trainer.score(X_test, y_test, verbose=True)
 
     if score_side_args is not None:
-        trainer.score_side(*score_side_args, verbose=True)
+#         try:
+            trainer.score_side(score_side_args, verbose=True)
+#         except Exception,e:
+#             print (e)
         
     return trainer
         
