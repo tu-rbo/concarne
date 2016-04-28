@@ -104,6 +104,7 @@ class Pattern(object):
         if isinstance(phi, list) or isinstance(phi, tuple):
             # if no input layer in list -> build it
             assert (input_var is not None)
+            phi = copy.deepcopy(phi)
             self.phi = \
                 self._initialize_function('phi', phi, self.default_phi_input,
                                           self.PHI_OUTPUT_SHAPE,
@@ -117,6 +118,7 @@ class Pattern(object):
 
         if isinstance(psi, list) or isinstance(psi, tuple):
             # if no input layer in list -> build it
+            psi = copy.deepcopy(psi)
             self.psi = \
                 self._initialize_function('psi', psi, self.default_psi_input,
                                           self.PSI_OUTPUT_SHAPE,
@@ -125,6 +127,7 @@ class Pattern(object):
         
         if beta is not None and isinstance(beta, list) or isinstance(beta, tuple):
             # if no input layer in list -> build it
+            beta = copy.deepcopy(beta)
             try:
               self.beta = \
                   self._initialize_function('beta', beta, self.default_beta_input,
