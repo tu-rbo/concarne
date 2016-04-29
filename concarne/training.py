@@ -37,7 +37,7 @@ class PatternTrainer(object):
                      num_epochs=3, batch_size=50, 
                      update_learning_rate=0.0001,
                      target_weight=0.9, side_weight=0.1)
-        > pt.fit_XYZ(X_train, y_train, Z_train, X_val=X_val, y_val=y_val,
+        > pt.fit_XYZ(X_train, y_train, [Z_train], X_val=X_val, y_val=y_val,
                 side_val=[X_val, Z_val], verbose=True)
             Training procedure: simultaneous
              Optimize phi & psi & beta using a weighted sum of target and side objective
@@ -73,7 +73,7 @@ class PatternTrainer(object):
             Score:
               loss:                 4.284542
               accuracy:             31.21 %            
-       > side_loss, side_acc = pt.score_side(X_test, Z_test, verbose=True)
+       > side_loss, side_acc = pt.score_side([X_test, Z_test], verbose=True)
             Score for side loss:
               loss:                 285.109184
               accuracy:             16.21 %            
@@ -82,7 +82,7 @@ class PatternTrainer(object):
        side information available than labels, you can use the method 
        fit_XZ_XY:
        
-        > pt.fit_XZ_XY(X_train, Z_train, X_train2, y_train, X_val=X_val, y_val=y_val)
+        > pt.fit_XZ_XY(X_train, [Z_train], X_train2, y_train, X_val=X_val, y_val=y_val)
         
        In the simultaneous procedure, instead of jointly optimizing the
        gradient for combined objective, we alternate the computation of the
@@ -415,7 +415,8 @@ class PatternTrainer(object):
             Verbosity level (default 0/False)
         """
 
-        if not isiterable(Zs):
+#         if not isiterable(Zs):
+        if type(Zs) != list and type(Zs) != tuple:
             raise Exception("Make sure that you provide a list of side "
                 + " information Zs, even if the pattern only expects one side variable")
 

@@ -60,36 +60,36 @@ if __name__ == "__main__":
     
     # Now let's define some side information: we simulate an additional sensor
     # which contains S, but embedded into a different space
-    C = np.random.randn(num_samples, side_dim)
-    # set second dimension of C to correspond to S
-    C[:, 1] = S[:,0]
+    Z = np.random.randn(num_samples, side_dim)
+    # set second dimension of Z to correspond to S
+    Z[:, 1] = S[:,0]
     
-    # let's make it harder to find S in X and C by applying a random rotations
+    # let's make it harder to find S in X and Z by applying a random rotations
     # to both data sets
     R = np.linalg.qr(np.random.randn(input_dim, input_dim))[0] # random linear rotation
     X = X.dot(R)
 
     Q = np.linalg.qr(np.random.randn(side_dim, side_dim))[0] # random linear rotation
-    C = C.dot(Q)
+    Z = Z.dot(Q)
    
     #--------------------------------------------------------
     # Define the pattern
     
     # now that we have some data, we can use a pattern to learn
     # from it. 
-    # since X and C are two different "views" of the relevant data S,
+    # since X and Z are two different "views" of the relevant data S,
     # the multi-view pattern is the most natural choice.
     
     # The pattern needs three functions: phi(X) which maps X to an intermediate
     # representation (that should somewhat correspond to S); psi which 
-    # performs classification using phi(X); and beta(C) which maps C to S.
+    # performs classification using phi(X); and beta(Z) which maps Z to S.
     # The goal of the multi-view pattern is to find phi and beta, s.t.
     # phi(X)~beta(X) and psi s.t. that psi(phi(X))~Y
     
     # Let's first define the theano variables which will represent our data
     input_var = T.matrix('inputs')  # for X
     target_var = T.ivector('targets')  # for Y
-    side_var = T.matrix('sideinfo')  # for C
+    side_var = T.matrix('sideinfo')  # for Z
     
     # Size of the intermediate representation phi(X); since S is 1-dim,
     # phi(X) can also map to a 1-dim vector
@@ -145,8 +145,8 @@ if __name__ == "__main__":
                                                  # we have to define two loss functions: 
                                                  # the target loss deals with optimizing psi and phi wrt. X & Y
                                                  target_loss=lasagne.objectives.categorical_crossentropy,
-                                                 # the side loss deals with optimizing beta and phi wrt. X & C,
-                                                 # for multi-view it is beta(C)~phi(X)
+                                                 # the side loss deals with optimizing beta and phi wrt. X & Z,
+                                                 # for multi-view it is beta(Z)~phi(X)
                                                  side_loss=lasagne.objectives.squared_error)
 
     #--------------------------------------------------------
@@ -163,28 +163,30 @@ if __name__ == "__main__":
     y_val = y[split:2*split]
     y_test = y[2*split:]
 
-    C_train = C[:split]
+    Z_train = Z[:split]
+    Z_val = Z[split:2*split]
+    Z_test = Z[2*split:]
     
     
     # instantiate the PatternTrainer which trains the pattern via stochastic
     # gradient descent
     trainer = concarne.training.PatternTrainer(pattern,
                                                procedure='simultaneous',
-                                               num_epochs=200,
+                                               num_epochs=500,
                                                batch_size=10,
                                                update=lasagne.updates.nesterov_momentum,
                                                update_learning_rate=0.01,
                                                update_momentum=0.9,
                                                )
    
-    # we use the fit_XYC method because our X, Y and C data all have the same
-    # size. Also note the [] our C_train - because it is possible to pass
+    # we use the fit_XYZ method because our X, Y and Z data all have the same
+    # size. Also note the [] our Z_train - because it is possible to pass
     # multiple side information to some patterns, you have to pass side information
     # in a list.
     # We can also pass validation data to the fit method, however it only
     # has an effect if we set the verbose switch to true to give us
     # information about the learning progress
-    trainer.fit_XYZ(X_train, y_train, [C_train], 
+    trainer.fit_XYZ(X_train, y_train, [Z_train], 
                     X_val=X_val, y_val=y_val, 
                     verbose=True)
 
