@@ -7,6 +7,8 @@ from lasagne.layers import get_all_layers
 from lasagne.layers import InputLayer
 from lasagne.layers import Layer
 
+import theano.tensor as T
+
 import numpy as np
 
 import itertools
@@ -16,6 +18,7 @@ import inspect
 import copy
 import os
 import tarfile
+from warnings import warn
 
 class Pattern(object):
     """
@@ -25,7 +28,7 @@ class Pattern(object):
     It is similar to :class:`lasagne.layers.Layer` and mimics some of 
     its functionality, but does not inherit from it.
     
-    === How to implement your own pattern? ===
+    ### How to implement your own pattern?
     The minimal example should implement the following functions:
 
     - get_side_objective
@@ -42,9 +45,9 @@ class Pattern(object):
     If you beta has multiple inputs, you will need to implement:
     - get_beta_output_for
 
-    Optionally, you might want to implement in order to use :method:`Pattern.score_side`:
-    - validation_side_input_vars(self):
-    - validation_side_target_var(self)
+    Optionally, if your side variable is a supervised learning target, then you
+    should return the theano variable representing this target in the method
+    - side_target_var(self)
 
     Parameters
     ----------
@@ -70,12 +73,11 @@ class Pattern(object):
         Shape of the intermediate representation to be learned
         (for some patterns that may coincide with the side_shape)
     target_loss: theano tensor variable, optional
-        Theano expression or lasagne objective for the optimizing the 
-        target.
+        Function (e.g. lasagne objective) for the optimizing the target.
         All patterns have standard objectives applicable here
     side_loss: theano tensor variable, optional
         Theano expression or lasagne objective for the side loss.
-        All patterns have standard objectives applicable here
+        Most patterns have standard objectives applicable here.
     name : string, optional
         An optional name to attach to this layer.
     """
@@ -116,9 +118,20 @@ class Pattern(object):
         if isfunction(self.target_loss):
             self.target_loss_fn = self.target_loss
             self.target_loss = None
+        else:
+            warn("target_loss: passing something different than a python function object "
+                 "to the constructor of a Pattern is deprecated. "
+                 "Recommended way is to use a function from lasagne.objectives "
+                 "or equivalent." )
+
         if isfunction(self.side_loss):
             self.side_loss_fn = self.side_loss
             self.side_loss = None
+        else:
+            warn("side_loss: passing something different than a python function object "
+                 "to the constructor of a Pattern is deprecated. "
+                 "Recommended way is to use a function from lasagne.objectives "
+                 "or equivalent." )
             
         # convert phi, psi and beta to real lasagne layers if they
         # are passed as a list/dictionary
@@ -195,40 +208,37 @@ class Pattern(object):
         return (self.input_var, self.target_var, self.side_var)
 
     @property
-    def validation_side_input_vars(self):
+    def side_input_vars(self):
         """Return the theano input variables for validating the side loss.
 
-           Order matters!
-            
-           This strongly depends on the pattern and is therefore implemented
-           individually. 
-           
-           It is not obligatory, but you will not be able to compute the side validation
-           loss.
+           Per default we assume that it is all training variables except for the 
+           target variable (see :method:`Pattern.training_input_vars`) and the
+           optional side target variable (see :method:`Pattern.side_target_var`).
 
-           Also see :method:`Pattern.validation_target_var`
+           You can override this method in your pattern.
+           
+           Order matters!
             
            Returns
            -------
            tuple of theano tensor variables
         """
-        raise NotImplementedError()
+        excluded_vars = [self.target_var]
+        if self.side_target_var is not None:
+            excluded_vars.append(self.side_target_var)
+        
+        return tuple([i for i in self.training_input_vars if i not in excluded_vars])
 
     @property
-    def validation_target_var(self):
+    def side_target_var(self):
         """Return the theano target variable required for validating
            the side information (optional).
 
-           This returns None per default. Override it the side loss of the pattern is a not a 
-           supervised loss. 
+           This returns None per default. 
+           Override it the side loss of the pattern is a supervised loss, and one of the
+           side variables is the supervised (side) target - and then return this variable.
             
-           This strongly depends on the pattern and is therefore implemented
-           individually. 
-           
-           It is not obligatory, but you will not be able to compute the side validation
-           loss during training.
-
-           Also see :method:`Pattern.validation_input_vars`
+           Also see :method:`Pattern.side_input_vars`
             
            Returns
            -------
@@ -600,6 +610,12 @@ class Pattern(object):
             else:
                 #print ("Target loss is function object: %s" % str(self.target_loss_fn))
                 fn = self.target_loss_fn
+
+            # special case: if we use the squared_error loss, but target_var is a vector
+            # (1 dim target) we flatten the prediction -- otherwise we get a theano error
+            if fn == lasagne.objectives.squared_error and \
+                target.type == T.dvector or target.type == T.dvector:
+                output = output.flatten()
             
             # define target loss
             self.target_loss = fn(output, target).mean()

@@ -11,6 +11,7 @@ import lasagne
 import concarne.lasagne
 from concarne.lasagne import score_categorical_crossentropy,\
     score_multivariate_categorical_crossentropy
+from concarne.utils import isfunction
 
 import theano
 import theano.tensor as T
@@ -153,8 +154,6 @@ class PatternTrainer(object):
                  XYpsi_num_epochs=None,
                  target_weight=None, 
                  side_weight=None,
-#                  test_objective=lasagne.objectives.categorical_crossentropy,
-#                  side_test_objective=None,
                  verbose=None,
                  save_params=False,
                  **kwargs):
@@ -204,8 +203,21 @@ class PatternTrainer(object):
             if side_weight is not None:
                 self.loss_weights['side_weight'] = side_weight
         
-        self.test_objective = pattern.target_loss_fn
-        self.side_test_objective = pattern.side_loss_fn
+        self.test_objective_fn = pattern.target_loss_fn
+        if self.test_objective_fn is None:
+            warn("You initialized your pattern with a custom target_loss, "
+                +"i.e. not a python function object, but probably a theano "
+                +"expression. PatternTrainer will not be able to compute "
+                +"the validation/test accuracy")
+            self.test_objective_fn = pattern.target_loss
+                
+        self.side_test_objective_fn = pattern.side_loss_fn
+        if self.side_test_objective_fn is None:
+            warn("You initialized your pattern with a custom side_loss, "
+                +"i.e. not a python function object, but probably a theano "
+                +"expression. PatternTrainer will not be able to compute "
+                +"the validation/test accuracy")
+            self.side_test_objective_fn = pattern.side_loss
         
         self.val_fn = None
         self.val_batch_iterator = None
@@ -280,14 +292,6 @@ class PatternTrainer(object):
         except:
             pass
         
-        # TODO can we give better feedback for classification case?
-#         target_var = self.pattern.target_var
-#         if self.test_objective == lasagne.objectives.categorical_crossentropy:
-#             outputs['acc'] = score_categorical_crossentropy(test_prediction, target_var)
-#         else: 
-#             test_acc = None
-
-
         # -----
         # get trainable params and build update
         params = lasagne.layers.get_all_params(self.pattern, trainable=True, **tags)
@@ -311,27 +315,27 @@ class PatternTrainer(object):
         train_fn = theano.function(train_fn_inputs, outputs, updates=updates)
         
         # FIXME
-        self._train_fn_no_update = theano.function(train_fn_inputs, outputs)
+        #self._train_fn_no_update = theano.function(train_fn_inputs, outputs)
     
         return train_fn
 
     def _compile_val_fn(self):
         return self.__compile_val_fn([self.pattern.input_var], self.pattern.target_var,
             lasagne.layers.get_output(self.pattern, deterministic=True),
-            self.test_objective)
+            self.test_objective_fn)
 
     def _compile_side_val_fn(self):
-        input_vars = self.pattern.validation_side_input_vars
-        target_var = self.pattern.validation_side_target_var
+        side_input_vars = self.pattern.side_input_vars
+        side_target_var = self.pattern.side_target_var
 
-        if target_var is not None:
-            return self.__compile_val_fn(input_vars, target_var,
+        if side_target_var is not None:
+            return self.__compile_val_fn(side_input_vars, side_target_var,
                 self.pattern.get_beta_output_for(deterministic=True),
-                self.side_test_objective)
+                self.side_test_objective_fn)
 
         else:
             _, _, side_loss = self.pattern.training_loss(all_losses=True)
-            return theano.function(input_vars, [side_loss.mean()])
+            return theano.function(side_input_vars, [side_loss.mean()])
 
         
     def __compile_val_fn(self, input_vars, target_var, 
@@ -343,14 +347,23 @@ class PatternTrainer(object):
         if type(input_vars) == tuple:
             input_vars = list(input_vars)
         
-        test_loss = test_objective(test_prediction, target_var).mean()
-        # Create an expression for the classification accuracy
-        if test_objective == lasagne.objectives.categorical_crossentropy:
-            test_acc = score_categorical_crossentropy(test_prediction, target_var)
-        elif test_objective == concarne.lasagne.multivariate_categorical_crossentropy:
-            test_acc = score_multivariate_categorical_crossentropy(test_prediction, target_var)
-        else: 
-            test_acc = None
+        # special case: if we use the squared_error loss, but target_var is a vector
+        # (1 dim target) we flatten the prediction -- otherwise we get a theano error
+        if test_objective == lasagne.objectives.squared_error and \
+            target_var.type == T.dvector or target_var.type == T.dvector:
+            test_prediction = test_prediction.flatten()
+        
+        test_acc = None
+        if isfunction(test_objective):
+            test_loss = test_objective(test_prediction, target_var).mean()
+            
+            # Create an expression for the classification accuracy
+            if test_objective == lasagne.objectives.categorical_crossentropy:
+                test_acc = score_categorical_crossentropy(test_prediction, target_var)
+            elif test_objective == concarne.lasagne.multivariate_categorical_crossentropy:
+                test_acc = score_multivariate_categorical_crossentropy(test_prediction, target_var)
+        else:
+            test_loss = test_objective
     
         outputs = [test_loss]
         if test_acc is not None:
@@ -460,7 +473,8 @@ class PatternTrainer(object):
             Verbosity level (default 0/False)
         """
         
-        if not isiterable(Zs):
+        #if not isiterable(Zs):
+        if type(Zs) != list and type(Zs) != tuple:
             raise Exception("Make sure that you provide a list of side "
                 + " information Zs, even if the pattern only expects one side variable")
 
@@ -606,7 +620,8 @@ class PatternTrainer(object):
                 print ("Optimize phi & psi & beta using a weighted sum of target and side objective")
                 print (" "+self.__update_info(self.update, update_params))
             if data_alignment == "XYZ":
-                print ("   -> standard mode with single training function")
+                if verbose:
+                    print ("   -> standard mode with single training function")
                 train_fn = self._compile_train_fn(self.pattern.training_input_vars,
                                                   loss_weights=self.loss_weights,
                                                   tags= {},
@@ -614,7 +629,8 @@ class PatternTrainer(object):
                                                   **update_params)
                 train_fn = [train_fn]*2
             else:
-                print ("   -> alternating mode with two training functions")
+                if verbose:
+                    print ("   -> alternating mode with two training functions")
                 lw1 = copy.copy(self.loss_weights)
                 lw1['target_weight'] = 0.
                 train_fn1 = self._compile_train_fn(train_vars_phase1,
@@ -757,11 +773,24 @@ class PatternTrainer(object):
         for batch in self.val_batch_iterator(X, y):
             inputs, targets = batch
             res = self.val_fn(inputs, targets)
+
             if len(res) == 2:
                 err, acc = res
             else:
-                err = res
+                assert (len(res) == 1)
+                if isiterable(res[0]):
+                    assert (len(res) == 1)
+                    err = res[0]
+                else:
+                    err = res
                 acc = np.nan
+
+#             if len(res) == 2:
+#                 err, acc = res
+#             else:
+#                 err = res
+#                 acc = np.nan
+                
             test_err += err
             test_acc += acc
             test_batches += 1
