@@ -50,14 +50,6 @@ class MultiViewPattern(Pattern):
     def default_beta_output_shape(self):
         return self.representation_shape
 
-    @property
-    def validation_side_input_vars(self):
-        return (self.input_var, self.side_var)
-        
-    @property
-    def validation_side_target_var(self):
-        return None
-                
     def __init__(self, **kwargs):
         assert('beta' in kwargs and kwargs['beta'] is not None)
         self.side_input_layer = None

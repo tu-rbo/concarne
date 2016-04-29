@@ -99,11 +99,7 @@ class PairwiseTransformationPattern(Pattern):
         return (self.side_var, self.side_transform_var)        
 
     @property
-    def validation_side_input_vars(self):
-        return (self.input_var, self.side_var)
-        
-    @property
-    def validation_side_target_var(self):
+    def side_target_var(self):
         return self.side_transform_var
         
 

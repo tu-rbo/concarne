@@ -103,11 +103,15 @@ class TestSinglePatternBase(TestPatternBase):
           Needs to be called explicitly by subclasses because inheriting
           test cases with nosetests is problematic (and not very transparent)"""
           
-        loss = self.pattern.training_loss(**self.loss_weights).mean()
+        loss, tloss, sloss = self.pattern.training_loss(all_losses=True, **self.loss_weights)
+        loss = loss.mean()
         train_fn_inputs = [self.input_var, self.target_var, self.side_var]
         
-        train_fn = theano.function(train_fn_inputs, loss)
-        assert (train_fn(self.X, self.Y, self.C) > 0)
+        train_fn = theano.function(train_fn_inputs, [loss,tloss, sloss])
+        l, tl, sl = train_fn(self.X, self.Y, self.C)
+#         assert (tl > 0)
+#         assert (sl > 0)
+        assert (l > 0)
 
         params = lasagne.layers.get_all_params(self.pattern, trainable=True)
         
@@ -181,7 +185,10 @@ class TestSinglePatternBase(TestPatternBase):
         self.trainer.fit_XYZ(self.X, self.Y, [self.C], X_val=self.X_val, y_val=self.Y_val,
             side_val=[self.X_val, self.C_val], verbose=verbose)
         
-        return self.trainer.score_side([self.X_val, self.C_val])
+        res = []
+        res += self.trainer.score(self.X_val, self.Y_val)
+        res += self.trainer.score_side([self.X_val, self.C_val])
+        return res
          
     def _test_pattern_trainer_XZ_XY_valXYZ (self, procedure='simultaneous', verbose=False):
         self.build_and_run_pattern_trainer(procedure)
@@ -292,16 +299,22 @@ class TestDirectPattern(TestSinglePatternBase):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="simultaneous", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     def test_pattern_trainer_XYZ_decoupled_valXYZ(self, verbose=False):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="decoupled", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     def test_pattern_trainer_XYZ_prefine_valXYZ(self, verbose=False):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="pretrain_finetune", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     #---
     def test_pattern_trainer_XZ_XY_simul_valXZ_XY(self, verbose=False):
@@ -430,16 +443,22 @@ class TestMultiViewPattern(TestSinglePatternBase):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="simultaneous", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     def test_pattern_trainer_XYZ_decoupled_valXYZ(self, verbose=False):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="decoupled", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     def test_pattern_trainer_XYZ_prefine_valXYZ(self, verbose=False):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="pretrain_finetune", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     #---
     def test_pattern_trainer_XZ_XY_simul_valXZ_XY(self, verbose=False):
@@ -577,16 +596,22 @@ class TestMultiTaskPattern(TestSinglePatternBase):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="simultaneous", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     def test_pattern_trainer_XYZ_decoupled_valXYZ(self, verbose=False):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="decoupled", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     def test_pattern_trainer_XYZ_prefine_valXYZ(self, verbose=False):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="pretrain_finetune", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     #---
     def test_pattern_trainer_XZ_XY_simul_valXZ_XY(self, verbose=False):
@@ -611,6 +636,178 @@ class TestMultiTaskPattern(TestSinglePatternBase):
         assert(np.isnan(res[3])) # because MSE
         
 # ------------------------------------------------------------------------------
+
+class TestMultiTaskClassificationPattern(TestSinglePatternBase):
+    """
+      Test the multi task pattern with linear models, but this time with 
+      a cross-entropy loss for classification (the other models are regression) 
+    """
+
+    def setup(self):
+        # define embedded C
+        self.C = np.array( [0,1,2,3,4], dtype='int32' ).T
+
+        self.C_val = np.array( [0,1,2,3,], dtype='int32' ).T
+        
+        # dim of side info
+        self.m = None #self.C.shape[1]
+        
+        # size of desired intermediate representation
+        self.d = 1
+
+        super(TestMultiTaskClassificationPattern, self).setup()
+
+    def init_variables(self):
+        self.input_var = T.matrix('inputs')
+        # do classification
+        self.target_var = T.ivector('targets')
+        self.side_var = T.ivector('contexts')
+        self.num_classes = 2 # number of classes matters
+        self.num_side_classes = 5 # number of classes matters
+        
+        self.side_loss = lasagne.objectives.categorical_crossentropy
+
+    def build_target_loss(self):
+        self.target_loss = lasagne.objectives.categorical_crossentropy
+
+    def build_pattern(self):
+        self.input_layer = lasagne.layers.InputLayer(shape=(None, self.n),
+                                            input_var=self.input_var)
+        self.phi = build_linear_simple( self.input_layer, self.d, name="phi")
+        self.psi = build_linear_simple( self.phi, self.num_classes, 
+            nonlinearity=lasagne.nonlinearities.softmax, name="psi")
+        self.beta = build_linear_simple( self.phi, self.num_side_classes, 
+            nonlinearity=lasagne.nonlinearities.softmax, name="beta")
+            
+        self.build_target_loss()
+        
+        self.pattern = concarne.patterns.MultiTaskPattern(phi=self.phi, psi=self.psi, 
+                                             beta=self.beta,
+                                             target_var=self.target_var, 
+                                             side_var=self.side_var,
+                                             target_loss=self.target_loss,
+                                             side_loss=self.side_loss
+                                             )
+
+    def test_pattern_output(self):
+        pass
+#         print (self.phi.W.get_value(borrow=True))
+#         assert (self.phi.W.get_value(borrow=True).shape == (self.n,self.d))
+#         self.phi.W.set_value ( np.array([[1,0]]).T )
+#         assert (self.phi.W.get_value(borrow=True).shape == (self.n,self.d))
+# 
+#         print (self.psi.W.get_value(borrow=True).shape)
+#         assert (self.psi.W.get_value(borrow=True).shape == (self.d,self.num_classes))
+#         self.psi.W.set_value ( np.array([[1,]]) )
+#         assert (self.psi.W.get_value(borrow=True).shape == (self.d,self.num_classes))
+# 
+#         assert (self.beta.W.get_value(borrow=True).shape == (self.d, self.m))
+#         # [1,1] means that we will project the intermediate representation
+#         # onto both dimensions of the output representation
+#         self.beta.W.set_value ( np.array([[1,1]]) )
+#         assert (self.beta.W.get_value(borrow=True).shape == (self.d, self.m))
+#         
+#         test_prediction = lasagne.layers.get_output(self.pattern, deterministic=True)
+#         test_fn = theano.function([self.input_var], test_prediction)
+#         X_hat = test_fn(self.X)
+#         assert ( np.all(X_hat == self.S) )
+# 
+#         beta_prediction = lasagne.layers.get_output(self.beta, deterministic=True)
+#         beta_fn = theano.function([self.input_var], beta_prediction)
+#         C_hat = beta_fn(self.X)
+#         assert ( np.all(C_hat[:,0] == self.S[:,0]) )
+#         assert ( np.all(C_hat[:,1] == self.S[:,0]) )
+
+    def test_pattern_training_loss_and_grads(self):
+        self._test_pattern_training_loss_and_grads()
+
+    def test_learn(self):
+        self._test_learn()
+
+    def test_pattern_trainer_XYZ_simul_valXY(self, verbose=False):
+        self._test_pattern_trainer_XYZ_valXY(procedure="simultaneous", verbose=verbose)
+
+    def test_pattern_trainer_XYZ_prefine_valXY(self, verbose=False):
+        self._test_pattern_trainer_XYZ_valXY(procedure="pretrain_finetune", verbose=verbose)
+
+    #---
+    def test_pattern_trainer_XYZ_simul_no_val(self, verbose=False):
+        res = self._test_pattern_trainer_XYZ_no_val(procedure="simultaneous", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+
+    def test_pattern_trainer_XYZ_decoupled_no_val(self, verbose=False):
+        res = self._test_pattern_trainer_XYZ_no_val(procedure="decoupled", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+
+    def test_pattern_trainer_XYZ_prefine_no_val(self, verbose=False):
+        res = self._test_pattern_trainer_XYZ_no_val(procedure="pretrain_finetune", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+
+    #---
+    def test_pattern_trainer_XYZ_simul_valXY(self, verbose=False):
+        res = self._test_pattern_trainer_XYZ_valXY(procedure="simultaneous", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+
+    def test_pattern_trainer_XYZ_decoupled_valXY(self, verbose=False):
+        res = self._test_pattern_trainer_XYZ_valXY(procedure="decoupled", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+
+    def test_pattern_trainer_XYZ_prefine_valXY(self, verbose=False):
+        res = self._test_pattern_trainer_XYZ_valXY(procedure="pretrain_finetune", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+
+    #---
+    def test_pattern_trainer_XYZ_simul_valXYZ(self, verbose=False):
+        res = self._test_pattern_trainer_XYZ_valXYZ(procedure="simultaneous", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+        assert(not np.isnan(res[2]))
+        assert(not np.isnan(res[3])) # because crossentropy!
+
+    def test_pattern_trainer_XYZ_decoupled_valXYZ(self, verbose=False):
+        res = self._test_pattern_trainer_XYZ_valXYZ(procedure="decoupled", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+        assert(not np.isnan(res[2]))
+        assert(not np.isnan(res[3])) # because crossentropy!
+
+    def test_pattern_trainer_XYZ_prefine_valXYZ(self, verbose=False):
+        res = self._test_pattern_trainer_XYZ_valXYZ(procedure="pretrain_finetune", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+        assert(not np.isnan(res[2]))
+        assert(not np.isnan(res[3])) # because crossentropy!
+
+    #---
+    def test_pattern_trainer_XZ_XY_simul_valXZ_XY(self, verbose=False):
+        res = self._test_pattern_trainer_XZ_XY_valXYZ(procedure="simultaneous", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+        assert(not np.isnan(res[2]))
+        assert(not np.isnan(res[3])) # because crossentropy!
+
+    def test_pattern_trainer_XZ_XY_decoupled_valXZ_XY(self, verbose=False):
+        res = self._test_pattern_trainer_XZ_XY_valXYZ(procedure="decoupled", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+        assert(not np.isnan(res[2]))
+        assert(not np.isnan(res[3])) # because crossentropy!
+
+    def test_pattern_trainer_XZ_XY_prefine_valXZ_XY(self, verbose=False):
+        res = self._test_pattern_trainer_XZ_XY_valXYZ(procedure="pretrain_finetune", verbose=verbose)
+        assert(not np.isnan(res[0]))
+        assert(not np.isnan(res[1])) # because crossentropy!
+        assert(not np.isnan(res[2]))
+        assert(not np.isnan(res[3])) # because crossentropy!
+        
+# ------------------------------------------------------------------------------
+
 
 class TestPWTransformationPattern(TestPatternBase):
     """
@@ -744,7 +941,10 @@ class TestPWTransformationPattern(TestPatternBase):
         self.trainer.fit_XYZ(self.X, self.Y, [self.CX, self.Cy], X_val=self.X_val, y_val=self.Y_val,
             side_val=[self.X_val, self.CX_val, self.Cy_val], verbose=verbose)
         
-        return self.trainer.score_side([self.X_val, self.CX_val, self.Cy_val])
+        res = []
+        res += self.trainer.score(self.X_val, self.Y_val)
+        res += self.trainer.score_side([self.X_val, self.CX_val, self.Cy_val])
+        return res
          
     def _test_pattern_trainer_XZ_XY_valXYZ (self, procedure='simultaneous', verbose=False):
         self.build_and_run_pattern_trainer(procedure)
@@ -799,16 +999,22 @@ class TestPWTransformationPattern(TestPatternBase):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="simultaneous", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     def test_pattern_trainer_XYZ_decoupled_valXYZ(self, verbose=False):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="decoupled", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     def test_pattern_trainer_XYZ_prefine_valXYZ(self, verbose=False):
         res = self._test_pattern_trainer_XYZ_valXYZ(procedure="pretrain_finetune", verbose=verbose)
         assert(not np.isnan(res[0]))
         assert(np.isnan(res[1])) # because MSE
+        assert(not np.isnan(res[2]))
+        assert(np.isnan(res[3])) # because MSE
 
     #---
     def test_pattern_trainer_XZ_XY_simul_valXZ_XY(self, verbose=False):
@@ -834,14 +1040,16 @@ class TestPWTransformationPattern(TestPatternBase):
         
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    td = TestMultiTaskPattern()
+    td = TestDirectPattern()
+    #td = TestMultiTaskPattern()
     #td = TestPWTransformationPattern()
+#     td = TestMultiTaskClassificationPattern()
     td.setup()
-    td.test_pattern_output()
-    td.test_pattern_training_loss_and_grads()
+#     td.test_pattern_output()
+#     td.test_pattern_training_loss_and_grads()
     td.test_learn()
     
-    verbose=False
+    verbose=True
     
     td.test_pattern_trainer_XYZ_simul_no_val(verbose=verbose)
     td.test_pattern_trainer_XYZ_decoupled_no_val(verbose=verbose)

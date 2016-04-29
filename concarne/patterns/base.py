@@ -118,7 +118,7 @@ class Pattern(object):
         if isfunction(self.target_loss):
             self.target_loss_fn = self.target_loss
             self.target_loss = None
-        else:
+        elif self.target_loss is not None:
             warn("target_loss: passing something different than a python function object "
                  "to the constructor of a Pattern is deprecated. "
                  "Recommended way is to use a function from lasagne.objectives "
@@ -127,7 +127,7 @@ class Pattern(object):
         if isfunction(self.side_loss):
             self.side_loss_fn = self.side_loss
             self.side_loss = None
-        else:
+        elif self.side_loss is not None:
             warn("side_loss: passing something different than a python function object "
                  "to the constructor of a Pattern is deprecated. "
                  "Recommended way is to use a function from lasagne.objectives "
@@ -619,6 +619,8 @@ class Pattern(object):
             
             # define target loss
             self.target_loss = fn(output, target).mean()
+            # store the function, too (required by PatternTrainer)
+            self.target_loss_fn = fn
 
     def _create_side_objective(self):
         """
@@ -627,6 +629,10 @@ class Pattern(object):
         if self.side_loss is None:
             assert (self.input_var is not None)
             assert (self.side_var is not None)
+            
+            if self.side_loss_fn is None:
+                # store the function, too (required by PatternTrainer)
+                self.side_loss_fn = self.default_side_objective
             
             self.side_loss = self.get_side_objective(self.input_var, self.side_var)
 

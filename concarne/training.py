@@ -204,20 +204,24 @@ class PatternTrainer(object):
                 self.loss_weights['side_weight'] = side_weight
         
         self.test_objective_fn = pattern.target_loss_fn
-        if self.test_objective_fn is None:
+        if self.test_objective_fn is None and pattern.target_loss_fn is not None:
             warn("You initialized your pattern with a custom target_loss, "
                 +"i.e. not a python function object, but probably a theano "
                 +"expression. PatternTrainer will not be able to compute "
                 +"the validation/test accuracy")
             self.test_objective_fn = pattern.target_loss
+        elif self.test_objective_fn is None:
+            raise Exception("Unable to infer target objective.")
                 
         self.side_test_objective_fn = pattern.side_loss_fn
-        if self.side_test_objective_fn is None:
+        if self.side_test_objective_fn is None and pattern.side_loss_fn is not None:
             warn("You initialized your pattern with a custom side_loss, "
                 +"i.e. not a python function object, but probably a theano "
                 +"expression. PatternTrainer will not be able to compute "
                 +"the validation/test accuracy")
             self.side_test_objective_fn = pattern.side_loss
+        elif self.side_test_objective_fn is None:
+            raise Exception("Unable to infer side objective.")
         
         self.val_fn = None
         self.val_batch_iterator = None
