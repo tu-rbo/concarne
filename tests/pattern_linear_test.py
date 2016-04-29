@@ -1045,11 +1045,11 @@ if __name__ == "__main__":
     #td = TestPWTransformationPattern()
 #     td = TestMultiTaskClassificationPattern()
     td.setup()
-#     td.test_pattern_output()
-#     td.test_pattern_training_loss_and_grads()
+    td.test_pattern_output()
+    td.test_pattern_training_loss_and_grads()
     td.test_learn()
     
-    verbose=True
+    verbose=False
     
     td.test_pattern_trainer_XYZ_simul_no_val(verbose=verbose)
     td.test_pattern_trainer_XYZ_decoupled_no_val(verbose=verbose)
