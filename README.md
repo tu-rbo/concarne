@@ -86,7 +86,7 @@ is equally applicable to reinforcement learning:
 
 Follow the installation requirements for these frameworks.
 
-For using the nolearn extension, you will need to install pydotplus, e.g. with pip
+For using the nolearn compatibility extension, you will need to install the newest version of [nolearn](https://github.com/dnouri/nolearn) which requires pydotplus.
 
 ### Running tests
 
