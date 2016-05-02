@@ -76,19 +76,25 @@ class TestPatternBase(object):
         self.target_loss = lasagne.objectives.squared_error
 
     def build_and_run_pattern_trainer(self, procedure):
-        # test that pattern trainer does not crash
+        optional_kwargs = {}
+        
+        # to avoid warnings
+        if procedure == "pretrain_finetune":
+            optional_kwargs ['XYpsi_num_epochs'] = 1
+        if procedure != "simultaneous":
+            optional_kwargs ['XZ_num_epochs'] = 1
+    
         self.trainer = concarne.training.PatternTrainer(self.pattern,
                                                procedure,
                                                num_epochs=1,
                                                batch_size=2,
-                                               XZ_num_epochs=1,
-                                               XYpsi_num_epochs=1,
                                                update=lasagne.updates.nesterov_momentum,
                                                update_learning_rate=1e-5,
                                                update_momentum=0.9,
                                                save_params=False,
                                                side_weight=0.5,
                                                target_weight=0.5,
+                                               **optional_kwargs
                                                )
         return self.trainer
         

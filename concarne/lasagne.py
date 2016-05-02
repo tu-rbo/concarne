@@ -160,7 +160,7 @@ def multivariate_categorical_crossentropy(predictions, targets):
     providing a vector of int for the targets is usually slightly more
     efficient than providing a matrix with a single 1.0 per row.
     """
-    num_results = len(predictions)
+    #num_results = len(predictions)
     
     losses = 0.
     for i, pred in enumerate(predictions):
@@ -184,7 +184,7 @@ def score_multivariate_categorical_crossentropy(predictions, target):
         
         score_fn = theano.function([inputs, targets], score_multivariate_categorical_crossentropy(prediction, targets))
     """
-    return T.mean([ T.eq(T.argmax(p, axis=1), target[:,i])
-           for (i, p) in enumerate(predictions)], dtype=theano.config.floatX)
+    return T.mean(T.concatenate([ T.eq(T.argmax(p, axis=1), target[:,i])
+           for (i, p) in enumerate(predictions)]), dtype=theano.config.floatX)
 
 # ------------------------------
