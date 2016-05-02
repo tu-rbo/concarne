@@ -58,7 +58,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'concarne'
-copyright = u'2015, Sebastian Hoefer, Rico Jonschkowski'
+copyright = u'2015-16, Sebastian Hoefer, Rico Jonschkowski'
 author = u'Sebastian Hoefer, Rico Jonschkowski'
 
 # The version info for the project you're documenting, acts as replacement for

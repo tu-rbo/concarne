@@ -69,20 +69,25 @@ class PatternTrainer(object):
               side validation loss:         313.270051
               side validation accuracy:     24.80 %
             Storing pattern to pt_2016-04-27_22-01-22-142855_simultaneous
-       > loss, acc = pt.score(X_test, y_test, verbose=True)
+
+       You can then easily compute the target and side loss for test data::
+
+        > loss, acc = pt.score(X_test, y_test, verbose=True)
             Score:
               loss:                 4.284542
               accuracy:             31.21 %            
-       > side_loss, side_acc = pt.score_side([X_test, Z_test], verbose=True)
-            Score for side loss:
+          side_loss, side_acc = pt.score_side([X_test, Z_test], verbose=True)
+             Score for side loss:
               loss:                 285.109184
               accuracy:             16.21 %            
 
        If in your task, you have more (or simply a different amount of)
        side information available than labels, you can use the method 
-       fit_XZ_XY:
+       fit_XZ_XY::
        
-        > pt.fit_XZ_XY(X_train, [Z_train], X_train2, y_train, X_val=X_val, y_val=y_val)
+        > pt.fit_XZ_XY(X_train_unlabeled, [Z_train_for_unlabeled], 
+                          X_train_labeled, y_train_for_labeled, 
+                          X_val=X_val, y_val=y_val)
         
        In the simultaneous procedure, instead of jointly optimizing the
        gradient for combined objective, we alternate the computation of the
