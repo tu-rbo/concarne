@@ -86,6 +86,8 @@ is equally applicable to reinforcement learning:
 
 Follow the installation requirements for these frameworks.
 
+For using the nolearn extension, you will need to install pydotplus, e.g. with pip
+
 ### Running tests
 
 In the concarne repository root, type

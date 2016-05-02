@@ -23,6 +23,10 @@ import nolearn.lasagne.visualize
 
         
 def pattern2neuralnet(pattern, verbose=0):
+    """
+     Apply this to a pattern object, and it will behave similar to a
+     nolearn.lasagne.NeuralNet object.
+    """
     pattern.layers = []
     pattern.layers_ = Layers()
     pattern.verbose = verbose
@@ -47,5 +51,7 @@ def pattern2neuralnet(pattern, verbose=0):
     return pattern
 
 class PrintLayerInfo(nolearn.lasagne.handlers.PrintLayerInfo):
+    """ PrintLayerInfo gives you a set of basic information about the pattern.
+    """
     def __call__(self, pattern, train_history=None):
         nolearn.lasagne.handlers.PrintLayerInfo.__call__(self, pattern2neuralnet(pattern), train_history=None)

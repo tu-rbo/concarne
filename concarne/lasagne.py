@@ -136,7 +136,7 @@ def multivariate_categorical_crossentropy(predictions, targets):
     Computes the categorical cross-entropy between a list of predictions and
         a multivariate target.
 
-    .. math:: L_i = \\sum_k - \\sum_j{t_{i,j}^k \\log(p_{i,j}^k)}
+    .. math:: L_i = - \\sum_k \\sum_j{t_{i,j}^k \\log(p_{i,j}^k)}
     
     Parameters
     ----------
