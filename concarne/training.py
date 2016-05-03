@@ -10,7 +10,8 @@ import lasagne
 
 import concarne.lasagne
 from concarne.lasagne import score_categorical_crossentropy,\
-    score_multivariate_categorical_crossentropy
+    score_multivariate_categorical_crossentropy,\
+    multivariate_categorical_crossentropy
 from concarne.utils import isfunction
 
 import theano
@@ -235,6 +236,8 @@ class PatternTrainer(object):
         self.side_val_batch_iterator = None
         self._side_val_fn_not_supported = False
                         
+        self._prediction_fn = None
+
         self.save_params = save_params
         if self.save_params:
             ts = generate_timestamp()
@@ -369,7 +372,7 @@ class PatternTrainer(object):
             # Create an expression for the classification accuracy
             if test_objective == lasagne.objectives.categorical_crossentropy:
                 test_acc = score_categorical_crossentropy(test_prediction, target_var)
-            elif test_objective == concarne.lasagne.multivariate_categorical_crossentropy:
+            elif test_objective == multivariate_categorical_crossentropy:
                 test_acc = score_multivariate_categorical_crossentropy(test_prediction, target_var)
         else:
             test_loss = test_objective
@@ -749,6 +752,49 @@ class PatternTrainer(object):
                 if side_val is not None:
                     print("  side validation loss:\t\t{:.6f}".format(side_val_err))
                     print("  side validation accuracy:\t{:.2f} %".format(side_val_acc * 100))
+
+    def _compile_prediction_fn(self, verbose=False):
+        # compile prediction function
+        if verbose:
+            print(" compiling theano prediction function...")
+            
+        output = lasagne.layers.get_output(self.pattern, deterministic=True)
+        self._prediction_fn = theano.function([self.pattern.input_var], output)
+        
+
+    def predict(self, X, verbose=False):
+        """
+        Predict class labels / regression target for samples in X.
+        """
+        if self._prediction_fn is None:
+            self._compile_prediction_fn(verbose)
+
+        res = self._prediction_fn(X)
+        
+        if self.test_objective_fn == lasagne.objectives.categorical_crossentropy:
+            return np.argmax(res, axis=1)
+        elif self.test_objective_fn == multivariate_categorical_crossentropy:
+            return [np.argmax(p, axis=1) for p in res]
+        
+        return res
+        
+    def predict_proba(self, X, verbose=False):
+        """ 
+        Probability estimates.
+        
+        Currently, this in only available for classification tasks
+        using categorical cross-entropy as loss.
+        """
+        if self.test_objective_fn != lasagne.objectives.categorical_crossentropy\
+            and self.test_objective_fn != lasagne.objectives.score_multivariate_categorical_crossentropy:
+            raise NotImplementedError("predict_proba is only supported for "
+                "(multivariate) categorical cross-entropy")
+                
+        if self._prediction_fn is None:
+            self._compile_prediction_fn(verbose)
+                
+        return self._prediction_fn(X)
+            
                                         
     def score(self, X, y, batch_size=None, verbose=False):
         """

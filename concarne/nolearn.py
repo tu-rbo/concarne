@@ -21,7 +21,7 @@ from nolearn.lasagne.base import Layers
 import nolearn.lasagne.handlers
 import nolearn.lasagne.visualize
 
-        
+
 def pattern2neuralnet(pattern, verbose=0):
     """
      Apply this to a pattern object, and it will behave similar to a
