@@ -1,6 +1,6 @@
 # concarne 
 
-#### a lightweight framework for learning with side information, based on Theano and Lasagne 
+#### a lightweight framework for learning with side information (aka privileged information), based on Theano and Lasagne 
 
 concarne implements various patterns for learning with side information presented in this [paper](http://arxiv.org/abs/1511.06429).
 
