@@ -28,8 +28,9 @@ class Pattern(object):
     It is similar to :class:`lasagne.layers.Layer` and mimics some of 
     its functionality, but does not inherit from it.
     
-    ### How to implement your own pattern?
-    The minimal example should implement the following functions:
+    *How to implement your own pattern?*
+    
+    A minimal example should implement the following functions:
 
     - get_side_objective
     - default_target_objective
@@ -37,16 +38,21 @@ class Pattern(object):
     - default_beta_input
     - default_beta_output_shape
 
-    Depending on the pattern, you might need to override (usually if you need 
-    additional side variables):
+    See the docstrings for each function to understand what it should do.
+
+    Depending on the pattern, you also might need to override (usually if you 
+    need additional side variables):
+    
     - training_input_vars
     - side_vars 
 
     If you beta has multiple inputs, you will need to implement:
+    
     - get_beta_output_for
 
     Optionally, if your side variable is a supervised learning target, then you
-    should return the theano variable representing this target in the method
+    should return the theano variable representing this target in the method:
+    
     - side_target_var(self)
 
     Parameters

@@ -115,9 +115,13 @@ class TestMultivariateDenseBase(object):
 #         print ( self.Y.T)
         #assert (np.all(np.vstack([res[-2], res[-1]]) == self.Y.T))
     
+#        err_fn = theano.function([self.input_var, self.target_var],
+#              T.mean(T.concatenate([ T.eq(T.argmax(p, axis=1), self.target_var[:,i])
+#                       for (i, p) in enumerate(prediction)]), dtype=theano.config.floatX))
+    
         err_fn = theano.function([self.input_var, self.target_var],
-              T.mean([ T.eq(T.argmax(p, axis=1), self.target_var[:,i])
-                       for (i, p) in enumerate(prediction)], dtype=theano.config.floatX))
+              concarne.lasagne.score_multivariate_categorical_crossentropy(prediction, self.target_var)
+              )
         assert(err_fn(self.X, self.Y) == 1.)
    
         

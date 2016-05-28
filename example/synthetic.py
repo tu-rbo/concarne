@@ -430,9 +430,14 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
                     side_val=score_side_val_args,
                     verbose=True)
 
+    # using the well-known scikit-learn API-like function predict you can
+    # see the learning result
+    #print (trainer.predict(X_test))
+
     print("=================")
     print("Test score...")
     trainer.score(X_test, y_test, verbose=True)
+
 
     if score_side_val_args is not None:
          try:

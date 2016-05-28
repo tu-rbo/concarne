@@ -76,23 +76,42 @@ class TestPatternBase(object):
         self.target_loss = lasagne.objectives.squared_error
 
     def build_and_run_pattern_trainer(self, procedure):
-        # test that pattern trainer does not crash
+        optional_kwargs = {}
+        
+        # to avoid warnings
+        if procedure == "pretrain_finetune":
+            optional_kwargs ['XYpsi_num_epochs'] = 1
+        if procedure != "simultaneous":
+            optional_kwargs ['XZ_num_epochs'] = 1
+    
         self.trainer = concarne.training.PatternTrainer(self.pattern,
                                                procedure,
                                                num_epochs=1,
                                                batch_size=2,
-                                               XZ_num_epochs=1,
-                                               XYpsi_num_epochs=1,
                                                update=lasagne.updates.nesterov_momentum,
                                                update_learning_rate=1e-5,
                                                update_momentum=0.9,
                                                save_params=False,
                                                side_weight=0.5,
                                                target_weight=0.5,
+                                               **optional_kwargs
                                                )
         return self.trainer
         
         
+    def _test_pattern_trainer_predict(self, verbose=False):
+        self.build_and_run_pattern_trainer(procedure='simultaneous')
+        # just check it doesn't crash
+        res = self.trainer.predict(self.X)
+        assert (not np.any(np.isnan(res)))
+
+    def _test_pattern_trainer_predict_proba(self, verbose=False):
+        self.build_and_run_pattern_trainer(procedure='simultaneous')
+        # just check it doesn't crash and is not nan
+        res = self.trainer.predict_proba(self.X)
+        assert (not np.any(np.isnan(res)))
+
+
 # ------------------------------------------------------------------------------
 class TestSinglePatternBase(TestPatternBase):
     def _test_pattern_training_loss_and_grads(self):
@@ -206,7 +225,6 @@ class TestSinglePatternBase(TestPatternBase):
         
         return res
         
-    
 # ------------------------------------------------------------------------------
 
 class TestDirectPattern(TestSinglePatternBase):
@@ -337,6 +355,9 @@ class TestDirectPattern(TestSinglePatternBase):
         assert(np.isnan(res[1])) # because MSE
         assert(not np.isnan(res[2]))
         assert(np.isnan(res[3])) # because MSE
+
+    def test_pattern_trainer_predict(self):
+        self._test_pattern_trainer_predict()
 
 # ------------------------------------------------------------------------------
 
@@ -482,6 +503,9 @@ class TestMultiViewPattern(TestSinglePatternBase):
         assert(not np.isnan(res[2]))
         assert(np.isnan(res[3])) # because MSE
 
+    def test_pattern_trainer_predict(self):
+        self._test_pattern_trainer_predict()
+
 # ------------------------------------------------------------------------------
 
 class TestMultiTaskPattern(TestSinglePatternBase):
@@ -552,12 +576,6 @@ class TestMultiTaskPattern(TestSinglePatternBase):
 
     def test_learn(self):
         self._test_learn()
-
-    def test_pattern_trainer_XYZ_simul_valXY(self, verbose=False):
-        self._test_pattern_trainer_XYZ_valXY(procedure="simultaneous", verbose=verbose)
-
-    def test_pattern_trainer_XYZ_prefine_valXY(self, verbose=False):
-        self._test_pattern_trainer_XYZ_valXY(procedure="pretrain_finetune", verbose=verbose)
 
     #---
     def test_pattern_trainer_XYZ_simul_no_val(self, verbose=False):
@@ -635,6 +653,9 @@ class TestMultiTaskPattern(TestSinglePatternBase):
         assert(not np.isnan(res[2]))
         assert(np.isnan(res[3])) # because MSE
         
+    def test_pattern_trainer_predict(self):
+        self._test_pattern_trainer_predict()
+
 # ------------------------------------------------------------------------------
 
 class TestMultiTaskClassificationPattern(TestSinglePatternBase):
@@ -724,12 +745,6 @@ class TestMultiTaskClassificationPattern(TestSinglePatternBase):
     def test_learn(self):
         self._test_learn()
 
-    def test_pattern_trainer_XYZ_simul_valXY(self, verbose=False):
-        self._test_pattern_trainer_XYZ_valXY(procedure="simultaneous", verbose=verbose)
-
-    def test_pattern_trainer_XYZ_prefine_valXY(self, verbose=False):
-        self._test_pattern_trainer_XYZ_valXY(procedure="pretrain_finetune", verbose=verbose)
-
     #---
     def test_pattern_trainer_XYZ_simul_no_val(self, verbose=False):
         res = self._test_pattern_trainer_XYZ_no_val(procedure="simultaneous", verbose=verbose)
@@ -805,6 +820,12 @@ class TestMultiTaskClassificationPattern(TestSinglePatternBase):
         assert(not np.isnan(res[1])) # because crossentropy!
         assert(not np.isnan(res[2]))
         assert(not np.isnan(res[3])) # because crossentropy!
+
+    def test_pattern_trainer_predict(self):
+        self._test_pattern_trainer_predict()
+
+    def test_pattern_trainer_predict_proba(self):
+        self._test_pattern_trainer_predict_proba()
         
 # ------------------------------------------------------------------------------
 
@@ -1038,6 +1059,9 @@ class TestPWTransformationPattern(TestPatternBase):
         assert(not np.isnan(res[2]))
         assert(np.isnan(res[3])) # because MSE                
         
+    def test_pattern_trainer_predict(self):
+        self._test_pattern_trainer_predict()
+        
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
     td = TestDirectPattern()
@@ -1045,24 +1069,27 @@ if __name__ == "__main__":
     #td = TestPWTransformationPattern()
 #     td = TestMultiTaskClassificationPattern()
     td.setup()
-    td.test_pattern_output()
-    td.test_pattern_training_loss_and_grads()
-    td.test_learn()
+#    td.test_pattern_output()
+#    td.test_pattern_training_loss_and_grads()
+#    td.test_learn()
     
+    td.test_pattern_trainer_predict()
+
     verbose=False
-    
-    td.test_pattern_trainer_XYZ_simul_no_val(verbose=verbose)
-    td.test_pattern_trainer_XYZ_decoupled_no_val(verbose=verbose)
-    td.test_pattern_trainer_XYZ_prefine_no_val(verbose=verbose)
+        
 
-    td.test_pattern_trainer_XYZ_simul_valXY(verbose=verbose)
-    td.test_pattern_trainer_XYZ_decoupled_valXY(verbose=verbose)
-    td.test_pattern_trainer_XYZ_prefine_valXY(verbose=verbose)
-    
-    td.test_pattern_trainer_XYZ_simul_valXYZ(verbose=verbose)
-    td.test_pattern_trainer_XYZ_decoupled_valXYZ(verbose=verbose)
-    td.test_pattern_trainer_XYZ_prefine_valXYZ(verbose=verbose)    
-
-    td.test_pattern_trainer_XZ_XY_simul_valXZ_XY(verbose=verbose)
-    td.test_pattern_trainer_XZ_XY_decoupled_valXZ_XY(verbose=verbose)
-    td.test_pattern_trainer_XZ_XY_prefine_valXZ_XY(verbose=verbose)
+#    td.test_pattern_trainer_XYZ_simul_no_val(verbose=verbose)
+#    td.test_pattern_trainer_XYZ_decoupled_no_val(verbose=verbose)
+#    td.test_pattern_trainer_XYZ_prefine_no_val(verbose=verbose)
+#
+#    td.test_pattern_trainer_XYZ_simul_valXY(verbose=verbose)
+#    td.test_pattern_trainer_XYZ_decoupled_valXY(verbose=verbose)
+#    td.test_pattern_trainer_XYZ_prefine_valXY(verbose=verbose)
+#    
+#    td.test_pattern_trainer_XYZ_simul_valXYZ(verbose=verbose)
+#    td.test_pattern_trainer_XYZ_decoupled_valXYZ(verbose=verbose)
+#    td.test_pattern_trainer_XYZ_prefine_valXYZ(verbose=verbose)    
+#
+#    td.test_pattern_trainer_XZ_XY_simul_valXZ_XY(verbose=verbose)
+#    td.test_pattern_trainer_XZ_XY_decoupled_valXZ_XY(verbose=verbose)
+#    td.test_pattern_trainer_XZ_XY_prefine_valXZ_XY(verbose=verbose)

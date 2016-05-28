@@ -39,7 +39,7 @@ Single Patterns
     :members:
 
 Pairwise Patterns
-~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
     
 .. autoclass:: concarne.patterns.PairwiseTransformationPattern
     :members:
@@ -48,7 +48,7 @@ Pairwise Patterns
     :members:
 
 PatternTrainer
---------
+--------------
 .. toctree::
   :maxdepth: 2
 
@@ -57,12 +57,28 @@ PatternTrainer
 
 
 Iterators
---------
+---------
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 1
 
 .. autoclass:: concarne.iterators.AlignedBatchIterator
     :members:
+
+lasagne extension
+-----------------
+.. toctree::
+  :maxdepth: 2
+
+.. automodule:: concarne.lasagne
+    :members:
+
+nolearn extension
+-----------------
+.. toctree::
+  :maxdepth: 2
+
+.. automodule:: concarne.nolearn
+    :members: 
     
 Indices and tables
 ==================
