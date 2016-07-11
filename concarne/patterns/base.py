@@ -120,6 +120,7 @@ class Pattern(object):
         self.name = name
         
         self.input_layer = None
+        self.get_output_kwargs = []
         
         if isfunction(self.target_loss):
             self.target_loss_fn = self.target_loss
