@@ -12,4 +12,4 @@ else:
     del install_instr
     del lasagne
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
