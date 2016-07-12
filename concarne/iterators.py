@@ -87,7 +87,8 @@ class AlignedBatchIterator(object):
         bs = self.batch_size
         indices = range(len(self.elem_list[0]))
         if self.shuffle:
-            np.random.shuffle(list(indices))
+            indices = list(indices)
+            np.random.shuffle(indices)
         for i in range((self.n_samples + bs - 1) // bs):
             sl = indices[slice(i * bs, (i + 1) * bs)]
             belem_dict = list_slice(self.elem_list, sl)

@@ -703,10 +703,9 @@ class PatternTrainer(object):
         # We iterate over epochs:
         for epoch in range(num_epochs):
             # In each epoch, we do a full pass over the training data:
-            train_err = 0
-            train_target_err = 0
-            train_side_err = 0
-            train_batches = 0
+            train_err = []
+            train_target_err = []
+            train_side_err = []
             start_time = time.time()
             
             for train_fn, batch_iterator, batch_iterator_args \
@@ -714,17 +713,12 @@ class PatternTrainer(object):
                 for batch in batch_iterator(*batch_iterator_args):
                     outputs = train_fn(*batch)
                     #outputs = self._train_fn_no_update(*batch) # for testing
-                    train_err += outputs['loss']
-                    train_batches += 1
+                    train_err.append(outputs['loss'])
                     if 'target_loss' in outputs:
-                        train_target_err += outputs['target_loss']
+                        train_target_err.append(outputs['target_loss'])
                     if 'side_loss' in outputs:
-                        train_side_err += outputs['side_loss']
+                        train_side_err.append(outputs['side_loss'])
             
-            # normalize by number of training functions                        
-            train_batches /= float(no_unique_train_fn)
-
-
             # And a pass over the validation data:
             if X_val is not None and y_val is not None:
                 bs = batch_iterators[-1].batch_size
@@ -735,17 +729,21 @@ class PatternTrainer(object):
                 side_val_err, side_val_acc = self.score_side(side_val)
     
             # Then we print the results for this epoch:
+            train_err_mean = np.mean(train_err)
+            train_target_err_mean = np.mean(train_target_err)
+            train_side_err_mean = np.mean(train_side_err)
+            
             if verbose:
                 if len(self.loss_weights) > 0:
-                    # normalize wrt weights
-                    train_target_err /= self.loss_weights['target_weight']
-                    train_side_err /= self.loss_weights['side_weight']
+                    # "de-normalize" wrt weights
+                    train_target_err_mean /= self.loss_weights['target_weight']
+                    train_side_err_mean /= self.loss_weights['side_weight']
             
                 print("Epoch {} of {} took {:.3f}s".format(
                     epoch + 1, num_epochs, time.time() - start_time))
-                print("  training loss:\t\t{:.6f}".format(train_err / train_batches))
-                print("   (target: {:.6f}, ".format(train_target_err / train_batches)
-                     + " side: {:.6f}".format(train_side_err / train_batches) + " (absolute))")
+                print("  training loss:\t\t{:.6f}".format(train_err_mean))
+                print("   (target: {:.6f}, ".format(train_target_err_mean)
+                     + " side: {:.6f}".format(train_side_err_mean) + " (absolute))")
     
                 if X_val is not None and y_val is not None:
                     print("  validation loss:\t\t{:.6f}".format(val_err))

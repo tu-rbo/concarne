@@ -85,10 +85,14 @@ is equally applicable to reinforcement learning:
 - [Lasagne](https://github.com/Lasagne/Lasagne)
 
 Follow the installation requirements for these frameworks.
+In general, it is recommended to use the latest versions by installing it from github:
+
+	```pip install --upgrade https://github.com/Theano/Theano/archive/master.zip```
+	```pip install --upgrade https://github.com/Lasagne/Lasagne/archive/master.zip```
 
 For using the nolearn compatibility extension, you will need to install the newest version of [nolearn](https://github.com/dnouri/nolearn) which requires pydotplus.
 
-The code was tested with Python 2.7.11+ and Python 3.5.2.
+concarne was tested with Python 2.7.11+ and Python 3.5.2.
 
 ### Running tests
 
