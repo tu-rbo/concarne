@@ -88,6 +88,8 @@ Follow the installation requirements for these frameworks.
 
 For using the nolearn compatibility extension, you will need to install the newest version of [nolearn](https://github.com/dnouri/nolearn) which requires pydotplus.
 
+The code was tested with Python 2.7.11+ and Python 3.5.2.
+
 ### Running tests
 
 In the concarne repository root, type

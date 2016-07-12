@@ -276,7 +276,7 @@ def main(pattern, data_representation, procedure, num_epochs, XZ_num_epochs, bat
         trainer.fit_XZ_XY(X_train, [C_train], X_sup, y_sup, X_val=X_test, y_val=y_test, verbose=True)
     except KeyboardInterrupt:                    
       print (" -- learning aborted")
-    except Exception, e:                    
+    except Exception as e:
       print (" -- learning failed")
       print (e)
 

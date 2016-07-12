@@ -176,7 +176,7 @@ class Pattern(object):
                                             self.default_beta_output_shape
                                             )
               self.beta._fun_name = "beta"
-            except ValueError, e:
+            except ValueError as e:
               raise Exception("Could not replace BETA_OUTPUT_SHAPE marker --"
                      " is the value returned by self.default_beta_output_shape"
                      " valid? (not None)\n"
@@ -457,7 +457,7 @@ class Pattern(object):
         # check if layers contains input layer; if not, create one
         user_input_layer = None
         for i, layer_def in enumerate(layers):
-            if isinstance(layer_def[0], basestring):
+            if isinstance(layer_def[0], str):
                 # The legacy format: ('name', Layer)
                 layer_name, layer_factory = layer_def
                 layer_kw = {'name': layer_name}
@@ -518,7 +518,7 @@ class Pattern(object):
         layer = None
         for i, layer_def in enumerate(layers):
             
-            if isinstance(layer_def[0], basestring):
+            if isinstance(layer_def[0], str):
                 # The legacy format: ('name', Layer)
                 layer_name, layer_factory = layer_def
                 layer_kw = {'name': layer_name}

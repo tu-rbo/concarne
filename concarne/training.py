@@ -296,12 +296,14 @@ class PatternTrainer(object):
         outputs['loss'] = loss
         try:
             outputs['target_loss'] =  target_loss.mean()
-        except:
+        except Exception as e:
+            #print (e)
             pass
             
         try:
             outputs['side_loss'] =  side_loss.mean()
-        except:
+        except Exception as e:
+            #print (e)
             pass
         
         # -----
@@ -682,7 +684,7 @@ class PatternTrainer(object):
         if side_val is not None and self.side_val_fn is None and not self._side_val_fn_not_supported:
             try:
                 self.side_val_fn = self._compile_side_val_fn()
-            except NotImplementedError, e:
+            except NotImplementedError as e:
                 warn("The pattern does not support score_side %s" % e)
                 self._side_val_fn_not_supported = True
                 side_val = None
@@ -720,7 +722,7 @@ class PatternTrainer(object):
                         train_side_err += outputs['side_loss']
             
             # normalize by number of training functions                        
-            train_batches /= no_unique_train_fn
+            train_batches /= float(no_unique_train_fn)
 
 
             # And a pass over the validation data:
@@ -879,7 +881,7 @@ class PatternTrainer(object):
         try:
             if self.side_val_fn is None:
                 self.side_val_fn = self._compile_side_val_fn()
-        except NotImplementedError, e:
+        except NotImplementedError as e:
             warn("The pattern does not support score_side %s" % e)
             return None
         

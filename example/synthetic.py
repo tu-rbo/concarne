@@ -442,7 +442,7 @@ def main(pattern_type, data, procedure, num_epochs=500, XZ_num_epochs=None, batc
     if score_side_val_args is not None:
          try:
             trainer.score_side(score_side_val_args, verbose=True)
-         except Exception,e:
+         except Exception as e:
              print (e)
         
     return trainer

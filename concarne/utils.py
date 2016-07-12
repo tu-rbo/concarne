@@ -5,6 +5,7 @@ __all__ = ["isfunction", "isiterable", "all_elements_equal_len", "generate_times
 import collections
 import numpy as np
 import datetime
+from functools import reduce
 
 def isfunction(f):
     return hasattr(f, '__call__')

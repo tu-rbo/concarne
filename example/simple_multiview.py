@@ -153,7 +153,7 @@ if __name__ == "__main__":
     # Training 
     
     # first split our data into training, test, and validation data
-    split = num_samples/3
+    split = int(num_samples/3)
 
     X_train = X[:split]
     X_val = X[split:2*split]
