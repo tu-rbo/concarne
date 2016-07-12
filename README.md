@@ -116,6 +116,11 @@ If you use concarne in your scientific work, please consider citing the followin
 
 We would also be glad if you sent us a copy of your paper!
 
+### Additional data from the paper
+
+The example scripts provided with concarne use some of the data from the paper "Patterns for Learning with Side Information".
+The full datasets and a description of how these datasets are stored, formatted and how they have been generated can be found at [TU Berlin](https://owncloud.tu-berlin.de/index.php/s/865193384483af385172f5871aa5cd36).
+
 ### Disclaimer
 
 Parts of concarne contain code from the [nolearn](https://github.com/dnouri/nolearn) library, Copyright (c) 2012-2015 Daniel Nouri.
