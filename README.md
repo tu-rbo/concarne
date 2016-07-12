@@ -81,11 +81,12 @@ is equally applicable to reinforcement learning:
 
 ### Requirements
 
-- [Theano](http://deeplearning.net/software/theano/)
-- [Lasagne](https://github.com/Lasagne/Lasagne)
+- [Theano](http://deeplearning.net/software/theano/) (version >=0.9)
+- [Lasagne](https://github.com/Lasagne/Lasagne) (version >=0.2)
 
 Follow the installation requirements for these frameworks.
-In general, it is recommended to use the latest versions by installing it from github:
+
+In general, it is recommended to use the latest versions by installing them from github:
 ```pip install --upgrade https://github.com/Theano/Theano/archive/master.zip```
 ```pip install --upgrade https://github.com/Lasagne/Lasagne/archive/master.zip```
 
